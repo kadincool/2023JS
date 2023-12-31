@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <style>
+            canvas {
+                border-style: solid;
+                border-width: 4px;
+                
+                border-radius: 15px;
+
+                position: absolute;
+                left: 50%; 
+                top: 50%; 
+                transform: translate(-50%, -50%);
+            }
+
+            body {
+                background-color: lightcyan;
+            }
+        </style>
+        <canvas width="100" height="100" id="board"></canvas>
+        <script>
+            let bElm = document.getElementById("board");
+            let b2D = bElm.getContext("2d");
+
+            let mouseX=0;
+            let mouseY=0;
+            let mouseClick=false;
+
+            let mouseTileX = 0;
+            let mouseTileY = 0;
+
+            let isPieceHeld = false;
+            let heldIndex = 0;
+            let turn = 1;
+
+            let boardSize = [5,3];
+
+            let path = [];
+            let pieces = [
+                1,0,0,0,2,
+                1,0,0,0,2,
+                1,0,0,0,2,
+            ];
+
+            let moveDist = 4;
+            let roll = true;
+
+            bElm.width = 100*boardSize[0];
+            bElm.height = 100*boardSize[1];
+
+            function drawPiece(piece,x,y) {
+                if (piece==1) {
+                    b2D.fillStyle = "red";
+                    b2D.beginPath();
+                    b2D.roundRect(x,y,60,60,10);
+                    b2D.fill();
+                    b2D.strokeStyle = "darkred";
+                    b2D.beginPath();
+                    b2D.roundRect(x,y,60,60,10);
+                    b2D.stroke();
+                } else if (piece==2) {
+                    b2D.fillStyle = "blue";
+                    b2D.beginPath();
+                    b2D.roundRect(x,y,60,60,10);
+                    b2D.fill();
+                    b2D.strokeStyle = "darkblue";
+                    b2D.beginPath();
+                    b2D.roundRect(x,y,60,60,10);
+                    b2D.stroke();
+                }
+            }
+
+            function frame() {
+                mouseTileX = Math.floor(mouseX/100);
+                mouseTileY = Math.floor(mouseY/100);
+                let tileIndex = mouseTileX+mouseTileY*boardSize[0];
+
+                if (roll) {
+                    alert("rolling...");
+                    moveDist=Math.floor(Math.random()*4)+1;
+                    alert("rolled a "+moveDist);
+                    roll=false;
+                }
+
+                if (mouseClick) {
+                    if (mouseTileX<0 || mouseTileX>=boardSize[0] || mouseTileY<0 || mouseTileY>=boardSize[1]) {
+                        isPieceHeld=false;
+                    } else {
+                        if (isPieceHeld) {
+                            if (tileIndex==heldIndex) {
+                                isPieceHeld=false;
+                                path=[];
+                            } else if (moveDist+1-path.length==0) {
+                                pieces[tileIndex]=pieces[heldIndex];
+                                pieces[heldIndex]=0;
+                                isPieceHeld=false;
+                                if (turn==2) {
+                                    turn=1;
+                                } else {
+                                    turn=2;
+                                }
+                                roll=true;
+                                path=[];
+                            }
+                            
+                        } else {
+                            if (pieces[tileIndex]==turn) {
+                                isPieceHeld=true;
+                                heldIndex=mouseTileX+mouseTileY*boardSize[0];
+                                path=[heldIndex];
+                            }
+                        }
+                    }
+                    mouseClick=false;
+                } else if (isPieceHeld) {
+                    if (tileIndex!=path[path.length-1]) {
+                        if (!(mouseTileX<0 || mouseTileX>=boardSize[0] || mouseTileY<0 || mouseTileY>=boardSize[1])) {
+                            if (path.includes(tileIndex)) {
+                                let index = path.indexOf(tileIndex);
+                                path.splice(index,path.length-index);
+                                path.push(tileIndex);
+                            } else if(Math.sqrt(((tileIndex%boardSize[0])-(path[path.length-1]%boardSize[0]))**2+(Math.floor(tileIndex/boardSize[0])-Math.floor(path[path.length-1]/boardSize[0]))**2)==1 && (pieces[tileIndex]==0 && moveDist+1-path.length>0 || (moveDist+1-path.length==1))) {
+                                path.push(tileIndex);
+                            }
+                        }
+                    }
+                }
+
+                b2D.fillStyle = "lightyellow";
+                b2D.fillRect(0,0,bElm.width,bElm.height);
+
+                b2D.fillStyle = "yellow";
+                b2D.fillRect(mouseTileX*100,mouseTileY*100,100,100);
+                
+                //board
+                b2D.strokeStyle = "black";
+                b2D.fillStyle = "black";
+                b2D.lineWidth = 4;
+
+                for (let i = 1; i<boardSize[0]; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(i*100,0);
+                    b2D.lineTo(i*100,boardSize[1]*100);
+                    b2D.stroke();
+                }
+
+                for (let i = 1; i<boardSize[1]; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(0,i*100);
+                    b2D.lineTo(boardSize[0]*100,i*100);
+                    b2D.stroke();
+                }
+
+                //path
+                if (pieces[heldIndex]==1) {
+                    b2D.strokeStyle = "darkred";
+                    b2D.fillStyle = "darkred";
+                } else if (pieces[heldIndex]==2) {
+                    b2D.strokeStyle = "darkblue";
+                    b2D.fillStyle = "darkblue";
+                }
+                for (let i=1; i<path.length; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(path[i-1]%boardSize[0]*100+50,Math.floor(path[i-1]/boardSize[0])*100+50);
+                    b2D.lineTo(path[i]%boardSize[0]*100+50,Math.floor(path[i]/boardSize[0])*100+50);
+                    b2D.stroke();
+                }
+                for (let i=0; i<path.length; i++) {
+                    b2D.fillRect(path[i]%boardSize[0]*100+45,Math.floor(path[i]/boardSize[0])*100+45,10,10);
+                }
+
+                //pieces
+                for (let i=0; i<pieces.length; i++) {
+                    if (!isPieceHeld || i!=heldIndex) {
+                        drawPiece(pieces[i],i%boardSize[0]*100+20,Math.floor(i/boardSize[0])*100+20);
+                    }
+                }
+
+                if (isPieceHeld) {
+                    drawPiece(pieces[heldIndex],mouseX-30,mouseY-30);
+                    b2D.font = "40px Courier New";
+                    b2D.textAlign = "center";
+                    if (pieces[heldIndex]==1) {
+                        b2D.fillStyle = "darkred";
+                    } else if (pieces[heldIndex]==2) {
+                        b2D.fillStyle = "darkblue";
+                    }
+                    b2D.fillText(moveDist+1-path.length, mouseX, mouseY+10);
+                }
+            }
+
+            document.addEventListener("mousedown", (e) => {mouseClick=true});
+            document.addEventListener("mouseup", (e) => {mouseClick=false});
+            document.addEventListener("mousemove", (e) => {
+                let canvasPos = bElm.getBoundingClientRect();
+                mouseX = e.pageX-canvasPos.left-4;
+                mouseY = e.pageY-canvasPos.top-4;
+            });
+
+            document.addEventListener("touchstart", (e) => {let canvasPos = bElm.getBoundingClientRect();mouseClick = true; mouseX=e.touches[0].clientX-canvasPos.left; mouseY=e.touches[0].clientY-canvasPos.top});
+            document.addEventListener("touchend", (e) => {mouseClick=false});
+            document.addEventListener("touchcancel", (e) => {mouseClick=false});
+            document.addEventListener("touchmove", (e) => {let canvasPos = bElm.getBoundingClientRect();mouseX=e.touches[0].clientX-canvasPos.left;mouseY=e.touches[0].clientY-canvasPos.top});
+            setInterval(frame,1);
+            //frame();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,17 @@
+make player not spawn in ground
+-- future --
+update Inputs EVEN HARDER FFS
+-----
+make loops async
+-----
+add CRT overlay
+-----
+add main menu
+-----
+seperate into different folders
+-----
+block physics
+-----
+block interactions
+-----
+lighting

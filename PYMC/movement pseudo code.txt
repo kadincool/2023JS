@@ -1,0 +1,21 @@
+set amount of stamina
+if jump button
+  if grounded and first jump //first jump implies that it hasnt jumped in this space press.
+    check and consume stamina(2) => move up
+  else if next to wall and pushing into wall //pushing is button in that direction is pressed
+    check and consume stamina(3) => move up
+  else
+    check and consume stamina(3) => dont fall
+
+if not move up
+  move down
+
+if down button
+  move down //fastfall
+
+if left button or right button the move in direction
+
+if crouch button
+  crouch
+else
+  uncrouch

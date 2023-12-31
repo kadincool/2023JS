@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <style>
+            canvas {
+                border-style: solid;
+                border-radius: 10px;
+            }
+        </style>
+        <canvas id="programCanvas" width="1000" height="500"></canvas>
+        <script>
+            const canvas = document.getElementById("programCanvas");
+            const ctx = canvas.getContext("2d");
+
+            let camX = 0;
+            let camY = 0;
+            let camZ = 0;
+
+            let camXRot = 0;
+            let camYRot = 0;
+            let camZRot = 0;
+
+            let plusX = [1,0,0];
+            let plusY = [0,1,0];
+            let plusZ = [0,0,1];
+
+            let scale = canvas.height/1;
+            //let scale = canvas.width;
+
+            const clipPlane = 0.01;
+
+            let keys = [];
+
+            function processPoints(x,y,z) {
+                //let scale = canvas.height/2;
+                let procY = plusX[1]*(x-camX)+plusY[1]*(y-camY)+plusZ[1]*(z-camZ);
+                let procZ = plusX[2]*(x-camX)+plusY[2]*(y-camY)+plusZ[2]*(z-camZ);
+                let procX = plusX[0]*(x-camX)+plusY[0]*(y-camY)+plusZ[0]*(z-camZ);
+                /*if (procZ<clipPlane) {
+                    //vertBehindClip+=1
+                    procZ=clipPlane;
+                }//*/
+                return [procX,procY,procZ];
+                //return [(x-camX)/(z-camZ)*scale+canvas.width/2,(y-camY)/(z-camZ)*scale+canvas.height/2];
+            }
+            
+            function triangle(a, b, c) {
+                let vertBehindClip = 0;
+
+                let procA = processPoints(a[0],a[1],a[2]);
+                let procB = processPoints(b[0],b[1],b[2]);
+                let procC = processPoints(c[0],c[1],c[2]);
+
+                let vertecies = [procA,procB,procC];
+
+                /*console.log(procA);
+                console.log(procB);
+                console.log(procC);
+                console.log(procA[0]/procA[2]);
+                console.log(procA[1]/procA[2]);
+                console.log(scale);*/
+
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                ctx.moveTo((procA[0]/procA[2])*scale+canvas.width/2,(procA[1]/procA[2])*scale+canvas.height/2);
+                ctx.lineTo((procB[0]/procB[2])*scale+canvas.width/2,(procB[1]/procB[2])*scale+canvas.height/2);
+                ctx.lineTo((procC[0]/procC[2])*scale+canvas.width/2,(procC[1]/procC[2])*scale+canvas.height/2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            let tris = [
+                [[1,1,1],[-1,1,1],[1,-1,1]],
+                [[-1,-1,1],[-1,1,1],[1,-1,1]],
+                [[1,1,1],[1,1,3],[1,-1,1]]
+            ]
+
+            function rtd(radians) {
+                return radians/2/Math.PI*360;
+            }
+
+            function dtr(degrees) {
+                return degrees/360*2*Math.PI;
+            }
+
+            function dsin(degrees) {
+                return Math.sin(degrees/360*2*Math.PI)
+            }
+            function dcos(degrees) {
+                return Math.cos(degrees/360*2*Math.PI)
+            }
+
+            function frame() {
+                ctx.fillStyle = "lightgray";
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                
+                if (keys[68]) {
+                    camX+=0.025;
+                }
+                if (keys[65]) {
+                    camX-=0.025;
+                }
+                if (keys[83]) {
+                    camZ-=0.025;
+                }
+                if (keys[87]) {
+                    camZ+=0.025;
+                }
+                if (keys[37]) {
+                    camYRot-=1;
+                }
+                if (keys[39]) {
+                    camYRot+=1;
+                }
+
+                plusX = [dcos(camYRot),0,-dsin(camYRot)];
+                plusY = [0,1,0];
+                plusZ = [dsin(camYRot),0,dcos(camYRot)];
+
+                for (let i=0; i<tris.length; i++) {
+                    triangle(tris[i][0], tris[i][1], tris[i][2]);
+                }
+                requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+
+            document.addEventListener("keydown", (e) => {keys[e.keyCode]=true;});
+            document.addEventListener("keyup", (e) => {keys[e.keyCode]=false;});
+            //triangle([1,1,1],[-1,1,1],[1,-1,1]);
+        </script>
+    </body>
+</html>

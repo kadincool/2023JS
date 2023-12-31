@@ -1,0 +1,10 @@
+add 1-2 frame / 250 ms delay to allow multiple buttons to be pressed
+add vector / float movement
+add mouse movement
+  get offset of target and mouse when mouse moves
+add order system
+
+things to add:
+ceiling climbing (less stamina to climb horizontally or full flight stamina to climb under and up)
+can pull up when uncrouching while climbing
+make down not first when uncrouching

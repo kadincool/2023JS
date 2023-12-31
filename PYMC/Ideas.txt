@@ -1,0 +1,35 @@
+for the sake of getting started, a 2d proof of concept will be made
+
+Tiles:
+ color
+ hue variance
+ saturation variance
+ value variance
+ mass
+ conversions (water flowing into dirt = mud)
+ integrety*
+ //when block is placed it calculates and stores structural integrety value based on highest value surrounding it
+ //* = per instance
+Chunk:
+ 8x8x8
+ 8 x stick values
+ 8 y stick values
+ 8 z stick values
+Generate:
+ custom script to make level
+ default:
+  get perlin noise
+  make values that are empty and under water level water
+  use 3d perlin noise to make caves and 3d terrain
+  scatter water throughout caves
+  scatter trees around surface
+  calculate integrety for each tile
+  set every tile as active
+  run physics pass untill stable or 1000 passes
+Tick:
+ for each active point:
+  check for updates
+  update tile:
+   add a bit of momentum to tile
+   do update
+   mark surrounding as moving

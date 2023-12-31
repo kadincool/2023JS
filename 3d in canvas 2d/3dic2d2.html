@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <style>
+            canvas {
+                border-style: solid;
+                border-radius: 10px;
+            }
+        </style>
+        <canvas id="programCanvas" width="1000" height="500"></canvas>
+        <script>
+            const canvas = document.getElementById("programCanvas");
+            const ctx = canvas.getContext("2d");
+
+            let camX = 0;
+            let camY = -2;
+            let camZ = 0;
+
+            let camXRot = 0;
+            let camYRot = 0;
+            let camZRot = 0;
+
+            let plusX = [1,0,0];
+            let plusY = [0,1,0];
+            let plusZ = [0,0,1];
+
+            let scale = canvas.width;
+            //let scale = 10;
+
+            const clipPlane = 0.01;
+
+            let keys = [];
+
+            function processPoint(x,y,z) {
+                //let scale = canvas.height/2;
+                let procX = plusX[0]*(x-camX)+plusY[0]*(y-camY)+plusZ[0]*(z-camZ);
+                let procY = plusX[1]*(x-camX)+plusY[1]*(y-camY)+plusZ[1]*(z-camZ);
+                let procZ = plusX[2]*(x-camX)+plusY[2]*(y-camY)+plusZ[2]*(z-camZ);
+                /*if (procZ<clipPlane) {
+                    //vertBehindClip+=1
+                    procZ=clipPlane;
+                }//*/
+                return [procX,procY,procZ];
+                //return [(x-camX)/(z-camZ)*scale+canvas.width/2,(y-camY)/(z-camZ)*scale+canvas.height/2];
+            }
+            
+            function triangle(a, b, c) {
+                let vertBehindClip = 0;
+
+                let procA = processPoint(a[0],a[1],a[2]);
+                let procB = processPoint(b[0],b[1],b[2]);
+                let procC = processPoint(c[0],c[1],c[2]);
+
+                let vertecies = [procA,procB,procC];
+
+                /*console.log(procA);
+                console.log(procB);
+                console.log(procC);
+                console.log(procA[0]/procA[2]);
+                console.log(procA[1]/procA[2]);
+                console.log(scale);*/
+
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                ctx.moveTo((procA[0]/procA[2])*scale+canvas.width/2,(procA[1]/procA[2])*scale+canvas.height/2);
+                ctx.lineTo((procB[0]/procB[2])*scale+canvas.width/2,(procB[1]/procB[2])*scale+canvas.height/2);
+                ctx.lineTo((procC[0]/procC[2])*scale+canvas.width/2,(procC[1]/procC[2])*scale+canvas.height/2);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function shape(pos,col) {
+                let procPoint = processPoint(pos[0],pos[1],pos[2]);
+                if (procPoint[2]>clipPlane) {
+                    ctx.fillStyle = col;
+                    ctx.beginPath();
+                    ctx.arc((procPoint[0]/procPoint[2])*scale+canvas.width/2,(procPoint[1]/procPoint[2])*scale+canvas.height/2,scale/10/procPoint[2],0,2*Math.PI);
+                    ctx.fill();
+                }
+            }
+            
+            /*let tris = [
+                [[1,1,1],[-1,1,1],[1,-1,1]],
+                [[-1,-1,1],[-1,1,1],[1,-1,1]],
+                [[1,1,1],[1,1,3],[1,-1,1]]
+            ]*/
+
+            let points = [
+                [1,1,1,"#ffff00"],
+                [-1,1,1,"#00ff00"],
+                [1,-1,1,"#ff0000"],
+                [-1,-1,1,"#000000"],
+                [1,1,3,"#ffffff"],
+                [-1,1,3,"#00ffff"],
+                [1,-1,3,"#ff00ff"],
+                [-1,-1,3,"#0000ff"],
+            ]
+            let colors = [
+                "#ffff00",
+                "#00ff00",
+                "#ff0000",
+                "#000000",
+                "#ffffff",
+                "#00ffff",
+                "#ff00ff",
+                "#0000ff",
+            ]
+
+            function rtd(radians) {
+                return radians/2/Math.PI*360;
+            }
+
+            function dtr(degrees) {
+                return degrees/360*2*Math.PI;
+            }
+
+            function dsin(degrees) {
+                return Math.sin(degrees/360*2*Math.PI)
+            }
+            function dcos(degrees) {
+                return Math.cos(degrees/360*2*Math.PI)
+            }
+
+            function frame() {
+                plusX = [dcos(camYRot),0,-dsin(camYRot)];
+                plusY = [0,1,0];
+                plusZ = [dsin(camYRot),0,dcos(camYRot)];
+
+                ctx.fillStyle = "lightgray";
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                let camSpeed=0.125;
+
+                if (keys[68]) {
+                    camX += plusX[0]*camSpeed;
+                    camZ -= plusX[2]*camSpeed;
+                }
+                if (keys[65]) {
+                    camX -= plusX[0]*camSpeed;
+                    camZ += plusX[2]*camSpeed;
+                }
+                if (keys[87]) {
+                    camX -= plusZ[0]*camSpeed;
+                    camZ += plusZ[2]*camSpeed;
+                }
+                if (keys[83]) {
+                    camX += plusZ[0]*camSpeed;
+                    camZ -= plusZ[2]*camSpeed;
+                }
+                if (keys[69]) {
+                    camY-=camSpeed;
+                }
+                if (keys[81]) {
+                    camY+=camSpeed;
+                }
+                if (keys[37]) {
+                    camYRot+=1;
+                }
+                if (keys[39]) {
+                    camYRot-=1;
+                }
+
+                /*for (let i=0; i<tris.length; i++) {
+                    triangle(tris[i][0], tris[i][1], tris[i][2]);
+                }*/
+
+                //process
+                let procPoints = []
+                for (let i=0; i<points.length; i++) {
+                    procPoints.push(processPoint(points[i][0],points[i][1],points[i][2]).concat(points[i][3]));
+                }
+                //sort
+                procPoints.sort((a,b) => b[2]-a[2]);
+                //draw
+                for (let i=0; i<procPoints.length; i++) {
+                    ctx.fillStyle = procPoints[i][3];
+                    if (procPoints[i][2]>clipPlane) {
+                        ctx.beginPath();
+                        ctx.arc((procPoints[i][0]/procPoints[i][2])*scale+canvas.width/2,(procPoints[i][1]/procPoints[i][2])*scale+canvas.height/2,50/procPoints[i][2],0,2*Math.PI);
+                        ctx.fill();
+                    }
+                }
+                requestAnimationFrame(frame);
+            }
+            requestAnimationFrame(frame);
+
+            document.addEventListener("keydown", (e) => {keys[e.keyCode]=true;});
+            document.addEventListener("keyup", (e) => {keys[e.keyCode]=false;});
+            //triangle([1,1,1],[-1,1,1],[1,-1,1]);
+        </script>
+    </body>
+</html>

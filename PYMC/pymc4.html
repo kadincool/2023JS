@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+  <title>Interactive Blocks</title>
+  <link rel="icon" href="./Img.bmp">
+  <body>
+    <style>
+      body {
+        background-color: black;
+        overflow: hidden;
+        margin: 0;
+      }
+    </style>
+    
+    <canvas id="GameCanvas" width="100" height="100"></canvas>
+
+    <script>
+      const canvas = document.getElementById("GameCanvas");
+      const can2d = canvas.getContext("2d")
+
+      var time = Date.now()
+      var deltaTime
+
+      var mouse = {
+        x: 0,
+        y: 0,
+        click: false,
+        wasClicked: false,
+      }
+      
+      var lastIndex
+      var lastCode = "getTile(tilX+camX*8,tilY+camY*8)"
+
+      var scale = 20
+      var repeatTimeDown = 100 //milliseconds
+      var repeatTimeUp = 250
+
+      var tilX = 0
+      var tilY = 0
+
+      var camX = 0
+      var camY = 0
+
+      var up = false
+      var down = true
+      var left = false
+      var right = false
+      var jump = false
+      var crouch = false
+      var quit = false
+
+      var inputsDown = false
+
+      var lastUpdate = 0
+
+      var playerX = 10
+      var playerY = 10
+      var playerLeft = false
+      var playerCrouched = false
+      var playerJump = 0
+      var held = 0
+      
+      var tile = [
+        {color: "#00000000", stick: 0, mass: 0},
+        {color: "#ffffff", stick: 100, mass: 10},
+        {color: "#ff7f00", stick: 1, mass: 20},
+        {color: "#007f00", stick: 50, mass: 5}
+      ]
+
+      var chunks = [] //[0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1, 1,1,1,2,2,1,1,1, 1,1,1,1,1,1,1,1]
+      var chunkIndex = []//[0,0,0],[1,0,1],[0,1,2],[1,1,3]
+      //genChunk(0,0)
+      //chunkIndex.sort((a,b) => {if (a[0] == b[0]) {return a[1] - b[1]} else {return a[0] - b[0]}})
+
+      var color = 0
+
+      function pmod(a,b) {return (a%b+b)%b}
+      function fdiv(a,b) {return Math.floor(a/b)}
+      function indx(x,y,s) {return pmod(x,s)+pmod(y,s)*s}
+
+      function drawChunk(chunkX,chunkY,screenX,ScreenY,drawScale) {
+        let chunk = getChunk(chunkX,chunkY)
+        if (chunk<0) {chunk = genChunk(chunkX,chunkY)}
+        //if (chunk<0) {return}
+        chunk=chunkIndex[chunk][2]
+        for (let i=0; i<64; i++) {
+          can2d.fillStyle=tile[chunks[chunk][i]].color
+          can2d.fillRect(screenX+pmod(i,8)*drawScale,ScreenY+fdiv(i,8)*drawScale,drawScale,drawScale)
+        }
+        return true
+      }
+
+      function getTile(tileX,tileY) {
+        //if (tileY<0) console.log(tileY)
+        let chunk = getChunk(fdiv(tileX,8),fdiv(tileY,8))
+        if (chunk==-1) {
+          chunk = genChunk(fdiv(tileX,8),fdiv(tileY,8))
+        }
+        return chunks[chunkIndex[chunk][2]][indx(tileX,tileY,8)]
+      }
+
+      function setTile(tileX,tileY,set) {
+        let chunk = getChunk(fdiv(tileX,8),fdiv(tileY,8))
+        if (chunk==-1) {
+          chunk = genChunk(fdiv(tileX,8),fdiv(tileY,8))
+        }
+        chunks[chunkIndex[chunk][2]][indx(tileX,tileY,8)] = set
+      }
+      
+      function getChunk(chunkX,chunkY) {
+        if (chunkIndex[lastIndex]!=null&&chunkIndex[lastIndex][0]==chunkX&&chunkIndex[lastIndex][1]==chunkY) {
+          //console.log("SPEED!!!")
+          return lastIndex
+        }
+        let bottom = 0
+        let top = chunkIndex.length-1
+        if (chunkIndex[0]==null) {return -1}
+        for (let i=0; i<100; i++) {
+          let current = Math.floor((top-bottom)/2+bottom)
+          //console.log("top: "+top+" bottom: "+bottom+" current: "+current)
+          if (chunkIndex[current][0]==chunkX) {
+            if (chunkIndex[current][1]==chunkY) {
+              //console.log("at "+current)
+              lastIndex=current
+              return current
+            } else if (chunkIndex[current][1]<chunkY) {
+              bottom = current+1
+              //console.log("aboveY "+current)
+            } else { //chunkIndex[current][1]>chunkY
+              top = current-1
+              //console.log("belowY "+current)
+            }
+          } else if (chunkIndex[current][0]<chunkX) {
+            bottom = current+1
+            //console.log("aboveX "+current)
+          } else { //chunkIndex[current][0]>chunkX
+            top = current-1
+            //console.log("belowX "+current)
+          }
+          if (bottom>top) {
+            return -1
+          }
+        }
+        alert("overloop")
+        return -2
+      }
+
+      function genProc(x,y) {
+        if (y>Math.sin(x/3)*5+Math.sin(x/5)*3+Math.sin(x/13)*2+14) {
+          return 2
+        } else if (y>-Math.sin(x/3)*10) {
+          return 1
+        } else {
+          return 0
+        }
+      }
+
+      function genChunk(chunkX,chunkY) {
+        //console.log(chunkX+", "+chunkY);
+        let chunkData = new Array(64).fill(0);
+        for (let i=0; i<chunkData.length; i++) {
+          let tileX = chunkX*8+pmod(i,8)
+          let tileY = chunkY*8+fdiv(i,8)
+          chunkData[i]=genProc(tileX,tileY-10)
+        }
+        /*2,2,2,2,2,2,2,2, 
+          2,0,0,0,0,0,0,2, 
+          2,0,0,0,0,0,0,2, 
+          2,0,0,0,0,0,0,2, 
+          2,0,0,0,0,0,0,2, 
+          2,0,0,0,0,0,0,2, 
+          2,0,0,0,0,0,0,2, 
+          2,2,2,2,2,2,2,2,*/
+        chunks.push(chunkData)
+        //console.log(chunkIndex.findIndex((a)=>{return a[0]>chunkX && a[1]>chunkY}))
+        //console.log(chunkIndex.findIndex((a) => {if (a[0] == chunkX) { return a[1] > chunkY } else { return a[0] > chunkX }}))
+        let currIndex = chunkIndex.findIndex((a) => {if (a[0] == chunkX) { return a[1] > chunkY } else { return a[0] > chunkX }})
+        if (currIndex>=0) {
+          chunkIndex.splice(currIndex, 0, [chunkX,chunkY,chunks.length-1])
+        } else {
+          chunkIndex.push([chunkX,chunkY,chunks.length-1])
+          currIndex=chunkIndex.length-1
+        }
+		    chunkIndex.sort((a,b) => {
+          if (a[0] == b[0]) {
+            return a[1] - b[1]
+          } else {
+            return a[0] - b[0]
+          }
+        })
+        return currIndex
+      }
+
+      function checkValid(x,y,crouch,left) {
+        if (crouch) {
+          if (left) {
+            if (getTile(x-1,y)) return false
+          } else {
+            if (getTile(x+1,y)) return false
+          }
+        } else {
+          if (getTile(x,y-1)) return false
+        }
+        return getTile(x,y)==0
+      }
+
+      function pn(bool) {
+        if (bool) {
+          return -1
+        } else {
+          return 1
+        }
+      }
+
+      function frame() {
+        now = Date.now()
+        deltaTime = now-time
+        time+=deltaTime
+
+        let justClicked = mouse.click&&!mouse.wasClicked
+        tilChanged = !(tilX==Math.floor(mouse.x/scale)-camX&&tilY==Math.floor(mouse.y/scale)-camY)
+        tilX=Math.floor(mouse.x/scale)-camX
+        tilY=Math.floor(mouse.y/scale)-camY
+
+        if (mouse.click&&tilChanged||justClicked) {
+          //console.log(getTile(tilX,tilY))
+          //console.log(chunks[getChunk(~~(tilX/8),~~(tilY/8))])
+          let temp = held
+          held = getTile(tilX,tilY)
+          setTile(tilX,tilY,temp)
+        }
+        //move
+        inputsDown = false
+        if (checkValid(playerX, playerY+1, playerCrouched, playerLeft) && now-lastUpdate>repeatTimeDown) {
+          playerY+=1
+          inputsDown = true
+        }
+        if (jump) {
+          if (checkValid(playerX, playerY-1, playerCrouched, playerLeft) && now-lastUpdate>repeatTimeDown) {
+            playerY-=1
+            inputsDown = true
+          }
+        }
+        if (left && now-lastUpdate>repeatTimeDown) {
+          if (checkValid(playerX-1, playerY, playerCrouched, true)) {
+            playerX-=1
+            playerLeft=true
+            inputsDown = true
+          } else if (up && checkValid(playerX, playerY-1, playerCrouched, playerLeft) && checkValid(playerX-1, playerY-1, playerCrouched, true)) {
+            playerX-=1
+            playerY-=1
+            playerLeft=true
+            inputsDown = true
+          }
+        }
+        if (right && now-lastUpdate>repeatTimeDown) {
+          if (checkValid(playerX+1, playerY, playerCrouched, false)) {
+            playerX+=1
+            playerLeft=false
+            inputsDown = true
+          } else if (up && checkValid(playerX, playerY-1, playerCrouched, playerLeft) && checkValid(playerX+1, playerY-1, playerCrouched, false)) {
+            playerX+=1
+            playerY-=1
+            playerLeft=false
+            inputsDown = true
+          }
+        }
+        if (crouch) {
+          if (checkValid(playerX, playerY, true, playerLeft)) {
+            playerCrouched=true
+          } else if (!down && checkValid(playerX, playerY-1, true, playerLeft)) {
+            playerCrouched=true
+            playerY-=1
+          } else if (checkValid(playerX-pn(playerLeft), playerY, true, playerLeft)) {
+            playerCrouched=true
+            playerX-=pn(playerLeft)
+          }
+        } else if (checkValid(playerX, playerY, false, playerLeft)) {
+          playerCrouched=false
+        }
+        if (inputsDown) {
+          lastUpdate=now
+        }
+        //if grounded then jumps = 3 else move down
+        //if jump and jumps>0 and check then move up, jumps-=1
+        //if left then
+          //if check then move left else
+          //if up and check then move upLeft
+        //if right then
+          //if check then move right else
+          //if up and check then move upRight
+        //if crouch then
+          //if check then move crouch else
+          //if up and check then move crouchUp else
+          //if check then move crouchBack
+        //elseif uncrouch then
+          //if check then move uncrouch else
+          //if check then move uncrouchForward
+        camX = -playerX+10
+        camY = -playerY+10
+        color+=deltaTime*0.01
+        //scale-=deltaTime*0.001
+        //draw
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+
+        can2d.fillStyle = "hsl("+color+",100%,50%)"
+        can2d.fillRect(0,0,canvas.width,canvas.height)
+        //drawChunk(0,0,0,0,20)
+        for (let i=0; i<canvas.width/(scale*8); i++) {
+          for (let j=0; j<canvas.height/(scale*8); j++) {
+            drawChunk(i-fdiv(camX,8),j-fdiv(camY,8),(i*8+pmod(camX,8))*scale,(j*8+pmod(camY,8))*scale,scale)
+            can2d.fillStyle = "black";
+            can2d.fillText((i-fdiv(camX,8))+", "+(j-fdiv(camY,8)),(i*8+pmod(camX,8))*scale,(j*8+pmod(camY,8))*scale);
+            //drawChunk(i,j,i*8*scale,j*8*scale,scale)
+          }
+        }
+
+        /*can2d.fillStyle = "#FF0000"
+        can2d.fillRect(playerX*scale,playerY*scale,scale,scale)
+        can2d.fillStyle = "#FFC080"
+        if (playerCrouched) {
+          if (playerLeft) {
+            can2d.fillRect((playerX-1)*scale,playerY*scale,scale,scale)
+          } else {
+            can2d.fillRect((playerX+1)*scale,playerY*scale,scale,scale)
+          }
+
+        } else {
+          can2d.fillRect(playerX*scale,(playerY-1)*scale,scale,scale)
+        }*/
+
+        can2d.fillStyle = "#FF0000"
+        can2d.fillRect(10*scale,10*scale,scale,scale)
+        //can2d.fillRect(playerX*scale,playerY*scale,scale,scale)
+        can2d.fillStyle = "#FFC080"
+        if (playerCrouched) {
+          if (playerLeft) {
+            can2d.fillRect(9*scale,10*scale,scale,scale)
+            //can2d.fillRect((playerX-1)*scale,playerY*scale,scale,scale)
+          } else {
+            can2d.fillRect(11*scale,10*scale,scale,scale)
+            //can2d.fillRect((playerX+1)*scale,playerY*scale,scale,scale)
+          }
+
+        } else {
+          can2d.fillRect(10*scale,9*scale,scale,scale)
+          //can2d.fillRect(playerX*scale,(playerY-1)*scale,scale,scale)
+        }
+
+        can2d.fillStyle="#0000001f"
+        can2d.fillRect((tilX+camX)*scale,(tilY+camY)*scale,scale,scale)
+
+        can2d.fillStyle = "black";
+        can2d.fillText(tilX+", "+tilY+": "+getTile(tilX,tilY),10,20);
+        can2d.fillText(getChunk(fdiv(tilX,8),fdiv(tilY,8)),10,30);
+        can2d.fillText(held,10,40);
+        
+        mouse.wasClicked = mouse.click
+
+        if (!quit) requestAnimationFrame(frame)
+      }
+
+      document.onkeydown = function(pressed) {
+        if (pressed.key == "Insert") {
+          //alert(eval(prompt("Run code:", "chunks[getChunk(~~("+tilX+"/8),~~("+tilY+"/8))]")))
+          lastCode = prompt("Run code:", lastCode)
+          alert(eval(lastCode))
+        }
+        if (pressed.key.toLowerCase() == "w") {
+          up=true
+        }
+        if (pressed.key.toLowerCase() == "s") {
+          down=true
+        }
+        if (pressed.key.toLowerCase() == "a") {
+          left=true
+        }
+        if (pressed.key.toLowerCase() == "d") {
+          right=true
+        }
+        if (pressed.key == " ") {
+          jump=true
+        }
+        if (pressed.key == "Shift") {
+          crouch=true
+        }
+        if (pressed.key == "M") {
+          quit=true
+        }
+      }
+
+      document.onkeyup = function(released) {
+        if (released.key.toLowerCase() == "w") {
+          up=false
+        }
+        if (released.key.toLowerCase() == "s") {
+          down=false
+        }
+        if (released.key.toLowerCase() == "a") {
+          left=false
+        }
+        if (released.key.toLowerCase() == "d") {
+          right=false
+        }
+        if (released.key == " ") {
+          jump=false
+        }
+        if (released.key == "Shift") {
+          crouch=false
+        }
+      }
+
+      document.addEventListener("mousedown", (e) => {mouse.click=true})
+      document.addEventListener("mouseup", (e) => {mouse.click=false})
+      document.addEventListener("mousemove", (e) => {
+        mouse.x=e.pageX
+        mouse.y=e.pageY
+      })
+      frame()
+    </script>
+  </body>
+</html>

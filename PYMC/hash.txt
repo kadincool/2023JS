@@ -1,0 +1,5 @@
+function rand(x, y) {
+    return Math.abs(sin(x*12.9898+y*78.233) * 43758.5453)%1;
+}
+
+x*12.9898+y*78.233

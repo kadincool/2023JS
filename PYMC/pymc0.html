@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <style>
+            body {
+                background-color: black;
+                overflow: hidden;
+                margin: 0;
+            }
+        </style>
+        
+        <canvas id="GameCanvas" width="100" height="100"></canvas>
+
+        <script>
+            const canvas = document.getElementById("GameCanvas");
+            const can2d = canvas.getContext("2d")
+
+            var time = Date.now()
+            var deltaTime
+
+            var mouseX = 0
+            var mouseY = 0
+            var click = false
+            var wasClicked = false
+            
+            var lastIndex
+
+            var scale = 20
+
+            var tilX = 0
+            var tilY = 0
+            
+            var tile = [
+                {color: "#00000000", stick: 0, mass: 0},
+                {color: "#ffffff", stick: 100, mass: 10},
+                {color: "#ff7f00", stick: 1, mass: 20},
+                {color: "#007f00", stick: 50, mass: 5}
+            ]
+
+            var chunks = [] //[0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1, 1,1,1,2,2,1,1,1, 1,1,1,1,1,1,1,1]
+            var chunkIndex = []//[0,0,0],[1,0,1],[0,1,2],[1,1,3]
+            //genChunk(0,0)
+            //chunkIndex.sort((a,b) => {if (a[0] == b[0]) {return a[1] - b[1]} else {return a[0] - b[0]}})
+
+            var color = 0
+
+            function drawChunk(chunkX,chunkY,screenX,ScreenY,drawScale) {
+                let chunk = getChunk(chunkX,chunkY)
+                if (chunk<0) {return false}
+                for (let i=0; i<64; i++) {
+                    can2d.fillStyle=tile[chunks[chunk][i]].color
+                    can2d.fillRect(screenX+(i%8)*drawScale,ScreenY+Math.floor(i/8)*drawScale,drawScale,drawScale)
+                }
+                return true
+            }
+
+            function getTile(tileX,tileY,gen) {
+                let chunk = getChunk(~~(tileX/8),~~(tileY/8))
+                return chunks[chunkIndex[chunk][2]][tileY%8*8+tileX%8]
+            }
+
+            function setTile(tileX,tileY,set,gen) {
+                let chunk = getChunk(~~(tileX/8),~~(tileY/8))
+                if (chunk==-1) {
+                    console.log("oops")
+                    return
+                }
+                chunks[chunkIndex[chunk][2]][tileY%8*8+tileX%8] = set
+            }
+
+            function getChunk(chunkX,chunkY) {
+                if (chunkIndex[lastIndex]!=null&&chunkIndex[lastIndex][0]==chunkX&&chunkIndex[lastIndex][1]==chunkY) {
+                    console.log("SPEED!!!")
+                    return lastIndex
+                }
+                let bottom = 0
+                let top = chunkIndex.length-1
+                if (chunkIndex[0]==null) {return -1}
+                for (let i=0; i<100; i++) {
+                    let current = Math.floor((top-bottom)/2+bottom)
+                    //console.log("top: "+top+" bottom: "+bottom+" current: "+current)
+                    if (chunkIndex[current][0]==chunkX) {
+                        if (chunkIndex[current][1]==chunkY) {
+                            //console.log("at "+current)
+                            lastIndex=current
+                            return current
+                        } else if (chunkIndex[current][1]<chunkY) {
+                            bottom = current+1
+                            //console.log("aboveY "+current)
+                        } else { //chunkIndex[current][1]>chunkY
+                            top = current-1
+                            //console.log("belowY "+current)
+                        }
+                    } else if (chunkIndex[current][0]<chunkX) {
+                        bottom = current+1
+                        //console.log("aboveX "+current)
+                    } else { //chunkIndex[current][0]>chunkX
+                        top = current-1
+                        //console.log("belowX "+current)
+                    }
+                    if (bottom>top) {
+                        return -1
+                    }
+                }
+                alert("overloop")
+                return -2
+            }
+
+            function genChunk(chunkX,chunkY) {
+                let chunkData = new Array(64).fill(1);
+                for (let i=0; i<chunkData.length; i++) {
+                    let tileX = chunkX*8+i%8
+                    let tileY = chunkY*8+~~(i/8)
+                    chunkData[i]=~~(Math.random()*tile.length);
+                }
+                /*2,2,2,2,2,2,2,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,0,0,0,0,0,0,2, 
+                    2,2,2,2,2,2,2,2,*/
+                chunks.push(chunkData)
+                //console.log(chunkIndex.findIndex((a)=>{return a[0]>chunkX && a[1]>chunkY}))
+                //console.log(chunkIndex.findIndex((a) => {if (a[0] == chunkX) { return a[1] > chunkY } else { return a[0] > chunkX }}))
+                let currIndex = chunkIndex.findIndex((a) => {if (a[0] == chunkX) { return a[1] > chunkY } else { return a[0] > chunkX }})
+                if (currIndex>=0) {
+                    chunkIndex.splice(currIndex, 0, [chunkX,chunkY,chunks.length-1])
+                } else {
+                    chunkIndex.push([chunkX,chunkY,chunks.length-1])
+                }
+		        /*chunkIndex.sort((a,b) => {
+                    if (a[0] == b[0]) {
+                        return a[1] - b[1]
+                    } else {
+                        return a[0] - b[0]
+                    }
+                })*/
+                return currIndex
+            }
+
+            function frame() {
+                deltaTime = Date.now()-time
+                time+=deltaTime
+
+                let justClicked = click&&!wasClicked
+                tilChanged = !(tilX==Math.floor(mouseX/scale)&&tilY==Math.floor(mouseY/scale))
+                tilX=Math.floor(mouseX/scale)
+                tilY=Math.floor(mouseY/scale)
+
+                color+=deltaTime*0.01
+                //scale+=deltaTime*0.1
+
+                canvas.width = window.innerWidth
+                canvas.height = window.innerHeight
+
+                can2d.fillStyle = "hsl("+color+",100%,50%)"
+                can2d.fillRect(0,0,canvas.width,canvas.height)
+                //drawChunk(0,0,0,0,20)
+                for (let i=0; i<canvas.width/(scale*8); i++) {
+                    for (let j=0; j<canvas.height/(scale*8); j++) {
+                        if (!drawChunk(i,j,i*scale*8,j*scale*8,scale)) {
+                            genChunk(i,j)
+                            drawChunk(i,j,i*scale*8,j*scale*8,scale)
+                        }
+                    }
+                }
+
+                can2d.fillStyle="#0000001f"
+                can2d.fillRect(tilX*scale,tilY*scale,scale,scale)
+
+                if (click&&tilChanged||justClicked) {
+                    setTile(tilX,tilY,(getTile(tilX,tilY)+1)%tile.length)
+                    //click=false
+                }
+                wasClicked = click
+
+                requestAnimationFrame(frame)
+            }
+
+            document.onkeydown = function(pressed) {
+                if (pressed.key = "tab") {
+                    eval(prompt("Run code:", "alert(chunks[getChunk(~~("+tilX+"/8),~~("+tilY+"/8))])"))
+                }
+            }
+
+            document.onkeyup = function(released) {
+                
+            }
+
+            document.addEventListener("mousedown", (e) => {click=true})
+            document.addEventListener("mouseup", (e) => {click=false})
+            document.addEventListener("mousemove", (e) => {
+                mouseX=e.pageX
+                mouseY=e.pageY
+            })
+            frame()
+        </script>
+    </body>
+</html>

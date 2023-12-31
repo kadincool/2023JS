@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html>
+    <title>Battle of the Dice</title>
+    <body>
+        <style>
+            canvas {
+                border-style: solid;
+                border-color: yellow;
+                border-width: 4px;
+                
+                border-radius: 15px;
+
+                position: absolute;
+                left: 50%; 
+                top: 50%; 
+                transform: translate(-50%, -50%);
+                box-shadow: 0 0 10px yellow;
+            }
+
+            body {
+                background-color: black;
+            }
+
+            a {
+                color: white;
+                text-decoration: none;
+                font-family: 'Courier New', Courier, monospace;
+                font-weight: bold;
+            }
+        </style>
+        <a href="https://kadincool.itch.io">kadincool.itch.io</a>
+        <canvas width="100" height="100" id="board">there should be a canvas here</canvas>
+        <script>
+            //make canvas
+            let bElm = document.getElementById("board");
+            let b2D = bElm.getContext("2d");
+
+            //mouse / touch
+            let mouseX=0;
+            let mouseY=0;
+            let mouseClick=false;
+
+            let menu = true;
+
+            let score = [0,0];
+            let results = true;
+            let victor = 0;
+
+            let mouseTileX = 0;
+            let mouseTileY = 0;
+
+            let isPieceHeld = false;
+            let heldIndex = 0;
+            let turn = 1;
+            //ai
+            let AIPlayers = [false, false];
+            let AIPathDecided = false;
+            let AIPath = [];
+            //anim properties
+            let anim = false;
+            let animPoint = 0;
+            let animSelected = 0;
+            let animTarget = [];
+            let animPos = [];
+
+            let lastTime = Date.now();
+            //setup board
+            let boardSize = [5,3];
+
+            let path = [];
+            const defaultLayout = [
+                1,0,0,0,2,
+                1,0,0,0,2,
+                1,0,0,0,2,
+            ];
+
+            let stars = [];
+
+            
+            let pieces = defaultLayout.slice();
+            //die (the object, this is not a threat... or is is *vsauce music*)
+            let moveDist = 4;
+            let roll = true;
+            let rollRemaining = 60;
+            
+            bElm.width = 100*boardSize[0];
+            bElm.height = 100*boardSize[1];
+
+            for (let i=0; i<50; i++) {
+                let z=Math.random()*5+1;
+                stars.push([Math.floor(Math.random()*bElm.width)*z-bElm.width/2,Math.floor(Math.random()*bElm.height)*z-bElm.height/2,z])
+            }
+
+            function drawPiece(piece,x,y) {
+                //function to quickly make a piece
+                b2D.lineWidth = 4;
+                if (piece==1) {
+                    b2D.fillStyle = "darkred";
+                    b2D.beginPath();
+                    b2D.roundRect(x+20,y+20,60,60,10);
+                    b2D.fill();
+                    b2D.strokeStyle = "red";
+                    b2D.shadowColor = "red";
+                    b2D.shadowBlur = 10;
+                    b2D.stroke();
+                    b2D.shadowBlur = 0;
+                } else if (piece==2) {
+                    b2D.fillStyle = "darkcyan";
+                    b2D.beginPath();
+                    b2D.roundRect(x+20,y+20,60,60,10);
+                    b2D.fill();
+                    b2D.strokeStyle = "cyan";
+                    b2D.shadowColor = "cyan";
+                    b2D.shadowBlur = 10;
+                    b2D.stroke();
+                    b2D.shadowBlur = 0;
+                }
+            }
+
+            function findPathOptionsOfTile(tile) {
+                //recurse through all options
+                let paths=[[tile]];
+                let lastPaths=[];
+                for (let i=0; i<moveDist; i++) {
+                    lastPaths=paths.slice();
+                    paths=[];
+                    for (let j=0; j<lastPaths.length; j++) {
+                        let currPath = lastPaths[j];
+                        let currPathLast = currPath[currPath.length-1];
+                        let validTiles = [0];
+                        let testTiles = [currPathLast+1,currPathLast-1,currPathLast+boardSize[0],currPathLast-boardSize[0]];
+                        if (i==moveDist-1) {
+                            validTiles.push(1);
+                            validTiles.push(2);
+                        }
+                        for (let k = 0; k<testTiles.length; k++){
+                            if (Math.sqrt(((testTiles[k]%boardSize[0])-(currPathLast%boardSize[0]))**2+(Math.floor(testTiles[k]/boardSize[0])-Math.floor(currPathLast/boardSize[0]))**2)==1&&testTiles[k]<boardSize[0]*boardSize[1]&&testTiles[k]>=0&&validTiles.includes(pieces[testTiles[k]])&&!currPath.includes(testTiles[k])) {
+                                paths.push(lastPaths[j].concat([testTiles[k]]));
+                            }
+                        }
+                    }
+                }
+                return paths;
+            }
+
+            function evaluate(toTile,fromTile,turn) {
+                //evaluate if a move is good or not
+                let score = 0;
+                if (pieces[toTile]!=0) {
+                    //good if take others piece, bad if take own
+                    if (pieces[toTile]==turn) {
+                        score-=3;
+                    } else {
+                        score+=3;
+                    }
+                }
+                //change board so evauates the state the game will be in
+                let tempLayout = pieces.slice();
+                tempLayout[toTile]=tempLayout[fromTile];
+                tempLayout[fromTile]=0;
+                //creates array of path arrays
+                let paths=[[toTile]];
+                //find other occurences of player turn so also evaluates risk to other pieces
+                for (let i=0; i<tempLayout.length; i++) {
+                    if (tempLayout[i]==turn&&tempLayout[i]!=toTile) {
+                        paths.push([tempLayout[i]]);
+                    }
+                }
+                let lastPaths=[];
+                //keeps track of what rolls have a propability of hitting them
+                let wasHit=[false, false, false, false];
+                for (let i = 0; i<4; i++) {
+                    lastPaths=paths.slice();
+                    paths=[]
+                    for (let j=0; j<lastPaths.length; j++) {
+                        let currPath = lastPaths[j];
+                        let currPathLast = currPath[currPath.length-1];
+                        let testTiles = [currPathLast+1,currPathLast-1,currPathLast+boardSize[0],currPathLast-boardSize[0]];
+                        for (let k = 0; k<testTiles.length; k++){
+                            if (Math.sqrt(((testTiles[k]%boardSize[0])-(currPathLast%boardSize[0]))**2+(Math.floor(testTiles[k]/boardSize[0])-Math.floor(currPathLast/boardSize[0]))**2)==1&&testTiles[k]<boardSize[0]*boardSize[1]&&testTiles[k]>=0) {
+                                if (tempLayout[testTiles[k]]===0&&!currPath.includes(testTiles[k])) {
+                                    paths.push(lastPaths[j].concat([testTiles[k]]));
+                                } else if (tempLayout[testTiles[k]]!==turn&&!currPath.includes(testTiles[k])) {
+                                    if (!wasHit[i]) {
+                                        score-=1;
+                                        //console.log(lastPaths[j].concat([testTiles[k]]));
+                                    }
+                                    wasHit[i]=true;
+                                }
+                            }
+                        }
+                    }
+                }
+                return score;
+            }
+
+            function frame() {
+                let delta = (Date.now()-lastTime)/1000;
+
+                mouseTileX = Math.floor(mouseX/100);
+                mouseTileY = Math.floor(mouseY/100);
+                let tileIndex = mouseTileX+mouseTileY*boardSize[0];
+
+                /*if (!pieces.includes(1)) {
+                    victor=2;
+                    score[1]+=1;
+                    results=true;
+                    //alert("Blue Wins!");
+                    //pieces=defaultLayout.slice();
+                    turn = 1;
+                }
+                if (!pieces.includes(2)) {
+                    victor=1;
+                    score[0]+=1;
+                    results=true;
+                    //alert("Red Wins!");
+                    //pieces=defaultLayout.slice();
+                    turn = 2;
+                }*///mostly redundent because of if stuck
+
+                //run pieces=[0,0,0,0,0, 0,0,0,0,2, 0,0,0,2,1]; in the debug terminal
+                let isStuck=true;
+                for (let i=0; i<pieces.length; i++) {
+                    if (pieces[i]==turn && findPathOptionsOfTile(i).length>0) {
+                        isStuck = false;
+                        break;
+                    }
+                }
+                if (isStuck&&!results) {
+                    //alert("stuck");
+                    if (turn==1) {
+                        victor=2;
+                        score[1]+=1;
+                        results=true;
+                        //alert("Blue Wins!");
+                        //pieces=defaultLayout.slice();
+                        turn = 1;
+                    }
+                    if (turn==2) {
+                        victor=1;
+                        score[0]+=1;
+                        results=true;
+                        //alert("Red Wins!");
+                        //pieces=defaultLayout.slice();
+                        turn = 2;
+                    }
+                }
+
+                if (AIPlayers[turn-1]&&!roll&&!anim) {
+                    let allMoves = []
+                    for (let i=0; i<pieces.length; i++) {
+                        if (pieces[i]==turn) {
+                            allMoves=allMoves.concat(findPathOptionsOfTile(i));
+                        }
+                    }
+                    let bestMoves=[allMoves[0]];
+                    let bestScore=evaluate(allMoves[0][allMoves[0].length-1],allMoves[0][0],turn);
+                    for (let i=1; i<allMoves.length; i++) {
+                        let currScore = evaluate(allMoves[i][allMoves[i].length-1],allMoves[i][0],turn);
+                        if (currScore>bestScore) {
+                            bestScore=currScore;
+                            bestMoves=[allMoves[i]];
+                        } else if (currScore==bestScore) {
+                            bestMoves.push(allMoves[i]);
+                        }
+                    }
+                    AIPath = bestMoves[Math.floor(Math.random()*bestMoves.length)];
+                    /*pieces[AIPath[AIPath.length-1]]=pieces[AIPath[0]];
+                    pieces[AIPath[0]]=0;
+                    if (turn==2) {
+                        turn=1;
+                    } else {
+                        turn=2;
+                    }
+                    roll=true;
+                    rollRemaining=60;
+                    AIPathDecided=false;*/
+                    anim=true;
+                    animPoint=0;
+                    animSelected=AIPath[0];
+                    animPos=[animSelected%boardSize[0]*100,Math.floor(animSelected/boardSize[0])*100];
+                    animTarget=animPos;
+                }
+
+                //if (roll) {
+                //    alert("rolling...");
+                //    moveDist=Math.floor(Math.random()*4)+1;
+                //    alert("rolled a "+moveDist);
+                //    roll=false;
+                //}
+                
+                if (mouseClick) {
+                    if (results) {
+                        if (score[0]>=5||score[1]>=5) {
+                            menu=true;
+                        }
+                        results=false;
+                        pieces = defaultLayout.slice();
+
+                    } else if (menu) {
+                        b2D.font = "bold 30px Courier New";
+                        let textOptionsWidth = b2D.measureText((AIPlayers[0] ?  'ai' : 'player')+" v.s. "+(AIPlayers[1] ?  'ai' : 'player')).width;
+                        b2D.font = "bold 60px Courier New";
+                        let textPlayWidth = b2D.measureText("play").width;
+                        if (10<mouseX&&mouseX<textOptionsWidth+10&&bElm.height-10-30<mouseY&&mouseY<bElm.height-10) {
+                            AIPlayers[1]=!AIPlayers[1];
+                        } else if (bElm.width-10-textPlayWidth<mouseX&&mouseX<bElm.width-10&&bElm.height-10-60<mouseY&&mouseY<bElm.height-10) {
+                            menu=false;
+                            let score = [0,0];
+                        }
+                    } else if (roll) {
+                        if (rollRemaining>0) {
+                            rollRemaining=0;
+                        } else {
+                            roll=false;
+                        }
+                    } else {
+                        if (mouseTileX<0 || mouseTileX>=boardSize[0] || mouseTileY<0 || mouseTileY>=boardSize[1]) {
+                            isPieceHeld=false;
+                        } else {
+                            if (isPieceHeld) {
+                                if (tileIndex=heldIndex) {
+                                    isPieceHeld=false;
+                                    path=[];
+                                    /*if (tileIndex==heldIndex) {
+                                    } else if(pieces[mouseTileX+mouseTileY*boardSize[0]]==turn) {
+                                        isPieceHeld=true;
+                                        heldIndex=mouseTileX+mouseTileY*boardSize[0];
+                                        path=[heldIndex];
+                                    }*/
+                                } else if (moveDist+1-path.length==0&&path[path.length-1]==tileIndex) {
+                                    pieces[tileIndex]=pieces[heldIndex];
+                                    pieces[heldIndex]=0;
+                                    isPieceHeld=false;
+                                    if (turn==2) {
+                                        turn=1;
+                                    } else {
+                                        turn=2;
+                                    }
+                                    roll=true;
+                                    rollRemaining=60;
+                                    path=[];
+                                }
+                                
+                            } else {
+                                if (pieces[tileIndex]==turn&&!AIPlayers[turn-1]) {
+                                    isPieceHeld=true;
+                                    heldIndex=mouseTileX+mouseTileY*boardSize[0];
+                                    path=[heldIndex];
+                                }
+                            }
+                        }
+                    }
+                    mouseClick=false;
+                } else if (isPieceHeld) {
+                    if (tileIndex!=path[path.length-1]) {
+                        if (!(mouseTileX<0 || mouseTileX>=boardSize[0] || mouseTileY<0 || mouseTileY>=boardSize[1])) {
+                            if (path.includes(tileIndex)) {
+                                let index = path.indexOf(tileIndex);
+                                path.splice(index,path.length-index);
+                                path.push(tileIndex);
+                            } else if(Math.sqrt(((tileIndex%boardSize[0])-(path[path.length-1]%boardSize[0]))**2+(Math.floor(tileIndex/boardSize[0])-Math.floor(path[path.length-1]/boardSize[0]))**2)==1 && (pieces[tileIndex]==0 && moveDist+1-path.length>0 || (moveDist+1-path.length==1))) {
+                                path.push(tileIndex);
+                            }
+                        }
+                    }
+                }
+                
+                b2D.fillStyle = "indigo";
+                b2D.fillRect(0,0,bElm.width,bElm.height);
+                
+                if (!roll&&!menu) {
+                    let mouseGradient = b2D.createRadialGradient(mouseX,mouseY,10,mouseX,mouseY,100);
+                    mouseGradient.addColorStop(0,"darkviolet");
+                    mouseGradient.addColorStop(1,"#4b008200");
+                    //b2D.fillStyle = "darkviolet";
+                    b2D.fillStyle = mouseGradient;
+                    b2D.fillRect(mouseTileX*100,mouseTileY*100,100,100);
+                }
+                
+                for (let i=0; i<stars.length; i++) {
+                    if (turn==1) {
+                        stars[i][0]+=delta*100;
+                        b2D.fillStyle="red";
+                        b2D.shadowColor = "red";
+                    } else {
+                        stars[i][0]-=delta*100;
+                        b2D.fillStyle="cyan";
+                        b2D.shadowColor = "cyan";
+                    }
+                    
+                    if (stars[i][0]/stars[i][2]>bElm.width/2) {
+                        stars[i][0]-=500*stars[i][2];
+                    }
+                    if (stars[i][0]/stars[i][2]<-bElm.width/2) {
+                        stars[i][0]+=500*stars[i][2];
+                    }
+                    //stars[i][0]=((stars[i][0]/stars[i][2]-bElm.width/2)%bElm.width+bElm.width/2)*stars[i][2];
+                    //b2D.fillStyle="white";
+                    b2D.shadowBlur = 10;
+                    b2D.fillRect(stars[i][0]/stars[i][2]-2+bElm.width/2,stars[i][1]/stars[i][2]-2+bElm.height/2,4,4);
+                    b2D.shadowBlur = 0;
+                }
+                
+                //board
+                b2D.strokeStyle = "yellow";
+                b2D.shadowColor = "yellow";
+                b2D.shadowBlur = 10;
+                b2D.lineWidth = 4;
+                
+                for (let i = 1; i<boardSize[0]; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(i*100,0);
+                    b2D.lineTo(i*100,boardSize[1]*100);
+                    b2D.stroke();
+                }
+
+                for (let i = 1; i<boardSize[1]; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(0,i*100);
+                    b2D.lineTo(boardSize[0]*100,i*100);
+                    b2D.stroke();
+                }
+                
+                b2D.beginPath();
+                b2D.lineWidth = 0;
+                b2D.shadowColor = "yellow";
+                b2D.shadowBlur = 10;
+                b2D.roundRect(-2,-2,bElm.width+4,bElm.height+4,4);
+                b2D.stroke();
+                
+                b2D.shadowBlur = 0;
+                
+                //path
+                if (pieces[heldIndex]==1) {
+                    b2D.strokeStyle = "darkred";
+                    b2D.fillStyle = "red";
+                    b2D.shadowColor = "red";
+                } else if (pieces[heldIndex]==2) {
+                    b2D.strokeStyle = "darkcyan";
+                    b2D.fillStyle = "cyan";
+                    b2D.shadowColor = "cyan";
+                }
+                for (let i=1; i<path.length; i++) {
+                    b2D.beginPath()
+                    b2D.moveTo(path[i-1]%boardSize[0]*100+50,Math.floor(path[i-1]/boardSize[0])*100+50);
+                    b2D.lineTo(path[i]%boardSize[0]*100+50,Math.floor(path[i]/boardSize[0])*100+50);
+                    b2D.stroke();
+                }
+                for (let i=0; i<path.length; i++) {
+                    b2D.shadowBlur = 10;
+                    b2D.fillRect(path[i]%boardSize[0]*100+45,Math.floor(path[i]/boardSize[0])*100+45,10,10);
+                    b2D.shadowBlur = 0;
+                }
+                
+                //pieces
+                for (let i=0; i<pieces.length; i++) {
+                    if ((!isPieceHeld || i!=heldIndex) && (!anim || i!=AIPath[0])) {
+                        drawPiece(pieces[i],i%boardSize[0]*100,Math.floor(i/boardSize[0])*100);
+                    }
+                }
+
+                if (isPieceHeld) {
+                    drawPiece(pieces[heldIndex],mouseX-50,mouseY-50);
+                    b2D.font = "40px Courier New";
+                    b2D.textAlign = "center";
+                    b2D.textBaseline = "middle";
+                    if (pieces[heldIndex]==1) {
+                        b2D.fillStyle = "red";
+                    } else if (pieces[heldIndex]==2) {
+                        b2D.fillStyle = "cyan";
+                    }
+                    b2D.shadowBlur = 10;
+                    b2D.fillText(moveDist+1-path.length, mouseX, mouseY);
+                    b2D.shadowBlur = 0;
+                }
+
+                if (anim) {
+                    let addX = Math.abs(animTarget[0]-animPos[0])/100;
+                    const animSpeed = 5;
+                    //alert(animTarget[0]-animPos[0]);
+                    if (addX>delta*animSpeed) {
+                        addX = delta*animSpeed;
+                    }
+                    if ((animTarget[0]-animPos[0])/100<0) {
+                        addX = -addX;
+                    }
+                    let addY = Math.abs(animTarget[1]-animPos[1])/100;
+                    if (addY>delta*animSpeed) {
+                        addY = delta*animSpeed;
+                    }
+                    if ((animTarget[1]-animPos[1])/100<0) {
+                        addY = -addY;
+                    }
+                    //alert(addX);
+                    //alert(addY);
+                    addX*=100;
+                    addY*=100;
+                    animPos[0]+=addX;
+                    animPos[1]+=addY;
+                    if (animPos[0]==animTarget[0]&&animPos[1]==animTarget[1]) {
+                        animPoint+=1;
+                        if (animPoint<AIPath.length) {
+                            animTarget=[AIPath[animPoint]%boardSize[0]*100,Math.floor(AIPath[animPoint]/boardSize[0])*100];
+                        } else {
+                            pieces[AIPath[AIPath.length-1]]=pieces[AIPath[0]];
+                            pieces[AIPath[0]]=0;
+                            if (turn==2) {
+                                turn=1;
+                            } else {
+                                turn=2;
+                            }
+                            anim=false;
+                            roll=true;
+                            rollRemaining=60;
+                            AIPathDecided=false;
+                        }
+                    }
+                    drawPiece(pieces[animSelected],animPos[0],animPos[1]);
+                }
+
+                if (roll&&!menu&&!results) {
+                    b2D.fillStyle = "#0000007f";
+                    b2D.fillRect(0,0,bElm.width,bElm.height);
+                    //b2D.filter = "blur(60px)";
+
+                    b2D.fillStyle = "green";
+                    b2D.strokeStyle = "lime";
+                    b2D.shadowColor = "lime";
+                    b2D.beginPath()
+                    b2D.lineWidth = 4;
+                    b2D.moveTo(bElm.width/2,bElm.height/2-40);
+                    b2D.lineTo(bElm.width/2+50,bElm.height/2+40);
+                    b2D.lineTo(bElm.width/2-50,bElm.height/2+40);
+                    b2D.closePath();
+                    b2D.shadowBlur = 10;
+                    b2D.fill();
+                    b2D.shadowBlur = 0;
+
+                    b2D.stroke();
+                    if (rollRemaining>=0) {
+                        moveDist = Math.floor(Math.random()*4)+1;
+                    }
+                    b2D.font = "bold 40px Courier New";
+                    b2D.textAlign = "center";
+                    b2D.textBaseline = "middle";
+                    b2D.fillStyle = "lime";
+                    b2D.shadowBlur = 10;
+                    b2D.fillText(moveDist, bElm.width/2,bElm.height/2+10);//dont question it
+                    b2D.shadowBlur = 0;
+                    rollRemaining-=1;
+                    if (rollRemaining<-30&&AIPlayers[turn-1]) {
+                        roll=false;
+                    }
+                    //b2D.filter = "none";
+                }
+
+                if (results) {
+                    b2D.fillStyle = "#0000007f";
+                    b2D.fillRect(0,0,bElm.width,bElm.height);
+
+                    b2D.shadowBlur = 10;
+                    b2D.shadowColor = "white";
+                    b2D.font = "bold 80px Courier New";
+                    b2D.fillStyle = "white";
+                    b2D.textAlign = "center";
+                    b2D.textBaseline = "middle";
+                    b2D.fillText("to",bElm.width/2,bElm.height/2);
+                    b2D.font = "bold 160px Courier New";
+                    b2D.fillStyle = "red";
+                    b2D.shadowColor = "red";
+                    b2D.fillText(score[0],bElm.width/4,bElm.height/2);
+                    b2D.fillStyle = "cyan";
+                    b2D.shadowColor = "cyan";
+                    b2D.fillText(score[1],bElm.width/4*3,bElm.height/2);
+                    
+                    if (score[0]>=5) {
+                        b2D.font = "bold 80px Courier New";
+                        b2D.fillStyle = "red";
+                        b2D.shadowColor = "red";
+                        b2D.fillText("red wins",bElm.width/2,bElm.height/8);
+                    } else if (score[1]>=5) {
+                        b2D.font = "bold 80px Courier New";
+                        b2D.fillStyle = "cyan";
+                        b2D.shadowColor = "cyan";
+                        b2D.fillText("blue wins",bElm.width/2,bElm.height/8);
+                    }
+
+                    b2D.shadowBlur = 0;
+                } 
+
+                if (menu&&!results) {
+                    b2D.fillStyle = "#0000007f";
+                    b2D.fillRect(0,0,bElm.width,bElm.height);
+
+                    b2D.font = "bold 40px Courier New";
+                    b2D.textAlign = "start";
+                    b2D.textBaseline = "hanging";
+                    b2D.shadowBlur = 10;
+                    b2D.shadowColor = "red";
+                    b2D.fillStyle = "red";
+                    b2D.fillText("Battle",10,10);
+                    b2D.shadowColor = "lime";
+                    b2D.fillStyle = "lime";
+                    b2D.fillText("of the",10,50);
+                    b2D.shadowColor = "cyan";
+                    b2D.fillStyle = "cyan";
+                    b2D.fillText("Dice",10,90);
+                    b2D.textBaseline = "bottom";
+                    b2D.font = "bold 30px Courier New";
+                    b2D.fillStyle = "white";
+                    b2D.shadowColor = "white";
+                    b2D.fillText((AIPlayers[0] ?  'ai' : 'player')+" v.s. "+(AIPlayers[1] ?  'ai' : 'player'),10,bElm.height-10);
+                    b2D.textAlign = "end";
+                    b2D.font = "bold 60px Courier New";
+                    b2D.fillStyle = "yellow";
+                    b2D.shadowColor = "yellow";
+                    b2D.fillText("play", bElm.width-10, bElm.height-10);
+                    b2D.shadowBlur = 0;
+                }
+
+                lastTime += delta*1000;
+            }
+
+
+            document.addEventListener("mousemove", (e) => {
+                let canvasPos = bElm.getBoundingClientRect();
+                mouseX = e.pageX-canvasPos.left-4;
+                mouseY = e.pageY-canvasPos.top-4;
+            });
+            document.addEventListener("mousedown", (e) => {mouseClick=true});
+            document.addEventListener("mouseup", (e) => {mouseClick=false});
+
+            document.addEventListener("touchmove", (e) => {let canvasPos = bElm.getBoundingClientRect();mouseX=e.touches[0].clientX-canvasPos.left;mouseY=e.touches[0].clientY-canvasPos.top});
+            document.addEventListener("touchstart", (e) => {let canvasPos = bElm.getBoundingClientRect();mouseClick = true; mouseX=e.touches[0].clientX-canvasPos.left; mouseY=e.touches[0].clientY-canvasPos.top});
+            document.addEventListener("touchend", (e) => {mouseClick=false});
+            document.addEventListener("touchcancel", (e) => {mouseClick=false});
+            setInterval(frame,1);
+            //frame();
+        </script>
+    </body>
+</html>
