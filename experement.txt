@@ -1,0 +1,9 @@
+window.open("/", "hello", "width=200,height=200");
+
+window.open("file:///C:/Users/Kadin/OneDrive%20-%20Poudre%20School%20District/NEW%20FRONTIER/Square;%20the%20game/square8%20(polish).html", "hello", "width=500,height=500");
+
+window.open("C:\Users\Kadin\Downloads\square8_polish.html", "hello", "width=500,height=500");
+
+window.open("file:///C:/Users/Kadin/OneDrive%20-%20Poudre%20School%20District/NEW%20FRONTIER/Square%3b%20the%20game/square8%20(polish).html", "hello", "width=500,height=500");
+
+window.open("file:///C:/Users/Kadin/Downloads/square8_polish.html", "hello", "width=500,height=500");

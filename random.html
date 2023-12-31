@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<body>
+<script>
+function random() {
+let usableChars = prompt("What chars to use", "1234567890qwertyuiopasdfghjklzxcvbnm ");;
+let len = parseInt(prompt("length?", Math.floor(Math.random()*300+300).toString()));
+let output = "";
+for (let i = 0; i<len; i++) {
+output+=usableChars[Math.floor(Math.random()*usableChars.length)];
+}
+navigator.clipboard.writeText(output);
+}
+</script>
+<p>pretend I know html</p>
+<button type="button" onClick = 'random()'>hi</button>
+</body>

@@ -1,0 +1,56 @@
+<!doctype html>
+<body>
+<canvas id="gameCanvas"></canvas>
+<style> body {overflow:hidden; margin:0;} </style>
+<script>
+const canvas = document.getElementById("gameCanvas");
+
+const ctx = canvas.getContext("2d");
+
+player = {
+ x: 50,
+ y: 50
+};
+
+keys = {
+ up: false,
+ down: false,
+ left:false,
+ right:false,
+}
+
+function update() {
+ if (keys.left) {
+  player.x+=1;
+ }
+ 
+ //draw
+ canvas.width = window.innerWidth;
+ canvas.height = window.innerHeight;
+ ctx.fillStyle = "black";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle = "red";
+ ctx.fillRect(player.x,player.y,10,10);
+ 
+ requestAnimationFrame(update);
+}
+
+document.onkeydown = function(pressed) {
+ switch (pressed.key) {
+  case "d":
+  keys.left=true;
+  break;
+ }
+}
+
+document.onkeyup = function(released) {
+ switch (released.key) {
+  case "d":
+   keys.left=false;
+   break;
+ }
+}
+
+requestAnimationFrame(update);
+</script>
+</body>

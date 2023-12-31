@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<p id="fps"></p>
+<p id="avgFPS"></p>
+<p id="total"></p>
+<script>
+    var timer = Date.now();
+    var total = 0;
+    var framesEllapsed = 0;
+    const deltaFPS = document.getElementById("fps");
+    const AvarageFPS = document.getElementById("avgFPS");
+    const totalTime = document.getElementById("total");
+
+    function update() {
+        let delta =  ((Date.now() - timer)/1000)
+        deltaFPS.innerHTML = "Time since last frame = " + (1/delta).toFixed(2);
+        total += delta;
+        framesEllapsed++;
+        AvarageFPS.innerHTML = "Avarage Framerate = " + (framesEllapsed/total).toFixed(2);
+        totalTime.innerHTML = "Total Time = " + total.toFixed(2);
+        timer = Date.now();
+    }
+
+    //fixed fps update function
+    const targetFPS = 60;
+    var lastFrame = 0;
+
+    function updateHandler() {
+        let deltaTime = Date.now() - lastFrame; //change in time
+        if (targetFPS && deltaTime >= 1000 / targetFPS) { //if exeeds when next frame should happen
+            update();
+            lastFrame = Math.floor(Date.now() / (1000/targetFPS)) * (1000/targetFPS); //magic sauce: does when the frame SHOULD HAVE BEEN instead of when it is
+        }
+        requestAnimationFrame(updateHandler); //call next frame
+    }
+
+    requestAnimationFrame(updateHandler);
+    // end of fixed fps function
+
+    //avalible as one-liner
+    //const targetFPS = 60; var lastFrame = 0; function updateHandler() { let deltaTime = Date.now() - lastFrame; if (targetFPS && deltaTime >= 1000 / targetFPS) { update(); lastFrame = Math.floor(Date.now() / (1000/targetFPS)) * (1000/targetFPS); } requestAnimationFrame(updateHandler); } requestAnimationFrame(updateHandler);
+
+</script>

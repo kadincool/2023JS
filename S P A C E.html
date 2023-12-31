@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<body>
+<script>
+let input = prompt("what to space");
+let spaces = parseInt(prompt("how mant spaces"));
+let spaceString = "";
+for(let i=0; i<spaces; i++) {
+    spaceString+=" ";
+}
+let output = "";
+for(let i=0; i<input.length; i++) {
+    output+=input[i];
+    if (i!=input.length-1) {
+        output+=spaceString;
+    }
+}
+alert(output);
+</script>
+<p>pretend I know html</p>
+</body>

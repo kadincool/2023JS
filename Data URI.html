@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!-- saved from url=(0042)https://www.adminbooster.com/tool/data_uri -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>
+		Convert File to Data URI	</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="
+		Online tool to convert any file to a base64 string that can be reused as a data URI source.	">
+	<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@ApexAPI">
+	<meta property="og:description" content="
+		Online tool to convert any file to a base64 string that can be reused as a data URI source.	">
+	<meta property="og:url" content="https://www.adminbooster.com/tool/data_uri">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="
+		Convert File to Data URI	">
+	<meta property="og:image" content="
+		https://www.adminbooster.com/pic/Adminbooster_logo_grey_notagline.png	">
+	<meta name="rating" content="General">
+	<meta name="theme-color" content="#446cb3">
+    <!-- Qualified -->
+    <script type="text/javascript" async="" src="./Data URI_files/analytics.js.download"></script><script type="text/javascript" async="" src="./Data URI_files/js"></script><script type="text/javascript" async="" src="./Data URI_files/js(1)"></script><script>(function(w,q){w['QualifiedObject']=q;w[q]=w[q]||function(){(w[q].q=w[q].q||[]).push(arguments)};})(window,'qualified')</script>
+    <script async="" src="./Data URI_files/qualified.js.download"></script>
+    <!-- End Qualified -->
+    <link rel="stylesheet" type="text/css" href="./Data URI_files/style2.css">
+</head>
+
+<body>
+	<div id="nav">
+		<div class="nav-container">
+			<a href="https://www.adminbooster.com/" class="logo-container" title="Main Page">
+                <img src="./Data URI_files/Adminbooster_logo_white_notagline.png" alt="adminbooster" width="70">
+            </a>
+			<ul id="nav-list">
+				<li><a href="https://www.adminbooster.com/" title="Main Page">Home</a>
+				</li><li><a href="https://www.adminbooster.com/tool" title="Salesforce playground" target="_blank" rel="noopener noreferrer">Playground</a>
+				</li><li><a href="https://www.adminbooster.com/blog" title="The Blog">Blog</a>
+				</li><li><a href="https://www.adminbooster.com/about" title="Who and why">About</a>
+			</li></ul>
+			<div id="burger" onclick="toggleNav()">
+				<div></div>
+				<div></div>
+				<div></div>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const toggleNav = () => {
+			document.getElementById("nav-list").classList.toggle("open");
+		}
+	</script>
+
+	<main>
+<h1>File to data URI converter</h1><p>Generate a data URI from any picture, icon, or other file.<br>Secured processing done locally in the browser without sending anything over Internet.
+<br>By chosing an image, you can copy the result and use it inside any &lt;img src="xxx"&gt; tag
+<br>Can be used as a favicon too: &lt;link rel="icon" type="image/png" href="data:image/png;base64,xxx"&gt;
+<br>(replace xxx with the result that you copy and paste from the content of the text area that will be generated)
+<br>To use local file(s), drag &amp; drop it/them into the gray area below, or use the select button.
+<br>To use a picture from a web page, right-click and "copy" the picture from that page, and paste (Ctrl+V) it on this page.
+<br>More information on Data Uri can be found on <a href="https://en.wikipedia.org/wiki/Data_Uri" rel="nofollow" target="_blank">this page</a>.
+</p>
+<div id="dz" style="border:2px dashed #bbb;-moz-border-radius:5px;-webkit-border-radius:5px;border-radius:5px;width:92%;height:50px;background-color:#eee;color:#aaa;text-align:center;font-size:26pt;padding:25px">Paste or Drop file(s) here</div>
+<br>You can select file(s) too: <input type="file" id="files" multiple="" autofocus=""><br>
+<div id="output"></div>
+<script>
+	function doGet(fs){
+		document.getElementById('output').innerHTML='';
+		for(var i=0,f;f=fs[i]; i++){
+			var r=new FileReader();
+			r.onload=(function(tFile,fName,fType,fSize){
+				return function(evt){
+					var div=document.createElement('div');
+					div.innerHTML='<hr/><b>'+(fName||'')+'</b> ('+fSize+' bytes -&gt; '+evt.target.result.length+' bytes) '+(fType||'')+' <textarea cols="50" rows="5" style="width:100%;">'+evt.target.result+'</textarea>';
+					document.getElementById('output').appendChild(div);
+				}
+			}(f,f.name,f.type,f.size));r.readAsDataURL(f)
+		}
+	}
+	if(window.File && window.FileReader && window.FileList && window.Blob){
+		var dz=document.getElementById('dz');
+		dz.addEventListener('dragover',function(evt){
+			evt.stopPropagation();
+			evt.preventDefault();
+			evt.dataTransfer.dropEffect='copy'
+		},false);
+		dz.addEventListener('drop',function(evt){
+			evt.stopPropagation();
+			evt.preventDefault();
+			doGet(evt.dataTransfer.files)
+		},false);
+		window.addEventListener("paste",function(evt){
+			items=evt.clipboardData.items;
+			for(var e=0;e<items.length;e++) if(items[e].kind==="file")doGet([items[e].getAsFile()])
+		});
+		var inp=document.getElementById("files");
+		inp.addEventListener("change",function(){
+			doGet([].slice.call(this.files));
+			inp.value=""
+		});
+	} else alert('Unsupported browser, not HTML5 compatible.');
+</script>
+<!-- <div class="search">
+	<div style="position:fixed;top:0">
+		<form action="//www.google.com" id="cse-search-box">
+			<div>
+				<input type="hidden" name="cx" value="partner-pub-9787607189989128:7560654004"/>
+				<input type="hidden" name="ie" value="UTF-8"/>
+				<input type="text" name="q" size="55" style="width:120px" />
+				<input type="submit" name="sa" value="Search"/>
+			</div>
+		</form>
+	</div>
+</div> -->
+
+<!-- ANALYTICS -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async="" src="./Data URI_files/js(2)"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+
+gtag('config', 'UA-42129584-2');
+</script>
+
+
+</main>
+
+
+</body></html>

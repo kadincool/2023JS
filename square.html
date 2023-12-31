@@ -1,0 +1,52 @@
+<style>
+    body {
+        overflow: hidden;
+        margin: 0;
+    }
+</style>
+
+<body>
+    <script>
+        var color = 0
+
+        var canvas = document.createElement("canvas")
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+        document.body.appendChild(canvas)
+
+        var canvas2d = canvas.getContext("2d")
+        var cursor = { x: 0, y: 0 }
+
+        function update() {
+            canvas.width = window.innerWidth
+            canvas.height = window.innerHeight
+            
+            color++
+
+            var gradient = canvas2d.createLinearGradient(0,0,canvas.width,0)
+
+            gradient.addColorStop(0,"hsl("+color+", 100%, 50%)")
+            gradient.addColorStop(1/6,"hsl("+(color+60)+", 100%, 50%)")
+            gradient.addColorStop(2/6,"hsl("+(color+120)+", 100%, 50%)")
+            gradient.addColorStop(3/6,"hsl("+(color+180)+", 100%, 50%)")
+            gradient.addColorStop(4/6,"hsl("+(color+240)+", 100%, 50%)")
+            gradient.addColorStop(5/6,"hsl("+(color+300)+", 100%, 50%)")
+            gradient.addColorStop(1,"hsl("+(color+360)+", 100%, 50%)")
+
+            //canvas2d.fillStyle = "hsl("+color+", 100%, 50%)"
+            canvas2d.fillStyle = gradient
+            canvas2d.fillRect(0,0,canvas.width,canvas.height)
+
+            //canvas2d.fillStyle = "lightgray"
+            canvas2d.fillStyle = "hsl("+(-color)+", 100%, 50%)"
+            canvas2d.fillRect(cursor.x,cursor.y,10,10)
+        }
+        
+        setInterval(update, 17)
+
+        document.addEventListener("mousemove", (e) => {
+            cursor.x = e.pageX
+            cursor.y = e.pageY
+        })
+    </script>
+</body>
