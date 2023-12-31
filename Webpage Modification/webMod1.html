@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Webpage Modifications V1</title>
+  </head>
+  <body>
+    <header id="header">webpage</header>
+    <main id="main">contents<br>more contents</main>
+    <footer id="footer">/webpage</footer>
+  </body>
+  <script>
+    const body = document.getElementsByTagName("body");
+    let toAdd = document.createElement("div");
+    let content = document.createTextNode("hehe, this wasnt here before");
+
+    toAdd.appendChild(content);
+    const target = document.getElementById("main");
+    console.log(target);
+    target.innerText += "\neven more text";
+    document.body.insertBefore(toAdd, target)
+  </script>
+</html>

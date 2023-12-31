@@ -1,0 +1,54 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<style>
+#div1, #div2 {
+  float: left;
+  min-width: 100px;
+  min-height: 35px;
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid black;
+}
+.square {
+  width: 80px;
+  height: 60px;
+  background-color: #444;
+}
+</style>
+<script>
+function allowDrop(event) {
+  console.log(event)
+  event.preventDefault();
+}
+
+function drag(event) {
+  console.log(event)
+  event.dataTransfer.setData("text", event.target.id);
+}
+
+function drop(event) {
+  console.log(event)
+  event.preventDefault();
+  var data = event.dataTransfer.getData("text");
+  event.target.appendChild(document.getElementById(data));
+}
+</script>
+</head>
+<body>
+
+<h2>Drag and Drop</h2>
+<p>Drag the image back and forth between the two div elements.</p>
+
+<div id="div1" ondrop="drop(event)" ondragover="allowDrop(event)">
+  <img src="img_w3slogo.gif" draggable="true" ondragstart="drag(event)" id="drag1" width="88" height="31">
+  
+</div>
+
+<div id="div2" ondrop="drop(event)" ondragover="allowDrop(event)">
+  <div class="square" draggable="true" ondragstart="drag(event)" id="drag2"></div>
+
+</div>
+
+</body>
+</html>

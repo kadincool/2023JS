@@ -1,0 +1,2 @@
+dash/go through, invis, shoot stun, freeze time
+dash that lets you go through a wall if close enough and stuns enemies if you go through

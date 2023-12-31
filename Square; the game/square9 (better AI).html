@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<style>
+    body {
+        background-color: black;
+        overflow: hidden;
+        margin: 0;
+    }
+    canvas {
+        position: absolute;
+        left: 50%; 
+        top: 50%; 
+        transform: translate(-50%, -50%);
+    }
+</style>
+<canvas id="gameCanvas"></canvas>
+<title>Square: the game</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACfSURBVEhL7ZYNCoAgDIVnV/JOdo2ukXfyTCayZIGlprMEP0Y/Q9reXoUCNgucLHhm41RgtL9tilTuwK7gUsDKNQSmqunrAW1cmB2vovj5RqBefuCB6zoEpqrpq6AAN+sQj/xWQTbsBUr+RfTdz14/PUgS86B01ndMD/JIFXBzDPGKcUakCJjysCtoti+ijWvtn9bnOxh/Z3cqYINZAcAB8Y08+Xu6ljgAAAAASUVORK5CYII=">
+<body>
+
+<script>
+
+//todo
+//DONE - make points that ai will patrol around to
+//DONE - make pseudo patrol points where player is commonly spotted
+//make camera pan
+//make it so collectable will add bits of map
+//DONE - make ai move slightly so sides of walls dont catch
+//make it so ai wont move if blocks vision to target
+//make enemies take time to notice you when farther away
+//finish load function
+//best score
+//triggers
+//pop out menu/main menu
+//make enemies not collide
+//seperate update and draw call
+//use webGL intead of 2d canvas
+//level editor that outputs a level string
+//bug - if enemy tries to go into corner then slides along x then y then x and so on...
+//bug - if enemy tries to go to player on one axis then will get caught eg. player (321,62) enemy (190,53) wall (200,60,300,80)
+
+//make canvas
+var canvas = document.querySelector("#gameCanvas")
+
+if (canvas) {
+    canvas.width = 500
+    canvas.height = 500
+} else {
+    canvas = document.createElement("canvas")
+    canvas.width = 500
+    canvas.height = 500
+    document.body.appendChild(canvas)
+}
+
+
+var canvas2d = canvas.getContext("2d")
+
+//define functions
+//check if 2 boxes collide
+function collide(box1, box2) {
+    return box1.x < box2.x + box2.width && box1.y < box2.y + box2.height && box1.x + box1.width > box2.x && box1.y + box1.height > box2.y
+}
+
+//check if box collides with wall array
+function arrayCollide(box,array) {
+    for (let i=0; i < array.length; i++) {
+        if (array[i].collidable && box.x < array[i].x + array[i].width && box.y < array[i].y + array[i].height && box.x + box.width > array[i].x && box.y + box.height > array[i].y) {
+            return i
+        }
+    }
+    return -1
+}
+
+function rayCalc(x1,y1,x2,y2) {
+    let slope = (y2-y1)/(x2-x1)
+    let b = y1-slope*x1
+    let islope = (x2-x1)/(y2-y1)
+    let ib = x1-islope*y1
+    let hits = []
+    for (let i=0; i < walls.length; i++) {
+        let samplePoint1 = slope*walls[i].x+b
+        let samplePoint2 = slope*(walls[i].x+walls[i].width)+b
+        let samplePoint3 = islope*walls[i].y+ib
+        let samplePoint4 = islope*(walls[i].y+walls[i].height)+ib
+        if (walls[i].y <= samplePoint1 && samplePoint1 <= walls[i].y + walls[i].height) {
+            hits.push({x: walls[i].x, y: samplePoint1})
+        }
+        if (walls[i].y <= samplePoint2 && samplePoint2 <= walls[i].y + walls[i].height) {
+            hits.push({x: walls[i].x + walls[i].width, y: samplePoint2})
+        }
+        if (walls[i].x <= samplePoint3 && samplePoint3 <= walls[i].x + walls[i].width) {
+            hits.push({x: samplePoint3, y: walls[i].y})
+        }
+        if (walls[i].x <= samplePoint4 && samplePoint4 <= walls[i].x + walls[i].width) {
+            hits.push({x: samplePoint4, y: walls[i].y + walls[i].height})
+        }
+    }
+    return hits
+}
+
+function cornerCast(x,y,width,height,targetX,targetY,targetWidth,targetHeight) {
+    if (!rayHitCalc(x,y,targetX,targetY)) {
+        return false;
+    }
+    if (!rayHitCalc(x+width,y,targetX+targetWidth,targetY)) {
+        return false;
+    }
+    if (!rayHitCalc(x,y+height,targetX,targetY+targetHeight)) {
+        return false;
+    }
+    if (!rayHitCalc(x+width,y+height,targetX+targetWidth,targetY+targetHeight)) {
+        return false;
+    }
+    return true;
+}
+
+function slowRayHitCalc(x1,y1,x2,y2) { //depricate
+    let ray = rayCalc(x1, y1, x2, y2)
+    let minX = x1
+    let maxX = x2
+    let minY = y1
+    let maxY = y2
+    if (x1>x2) {
+        let temp = x1
+        x1 = x2
+        x2 = temp
+    }
+    if (y1>y2) {
+        let temp = y1
+        y1 = y2
+        y2 = temp
+    }
+    for (let i = 0; i < ray.length; i++) {
+        if (x1 <= ray[i].x && ray[i].x <= x2) {
+            if (x1 == x2) {
+                if (y1 <= ray[i].y && ray[i].y <= y2) {
+                    return true
+                }
+            } else {
+                return true
+            }
+        }
+    }
+    return false
+
+}
+
+function rayHitCalc(x1,y1,x2,y2) { //fast find if hit
+    /*canvas2d.fillStyle = playerGradient;
+    canvas2d.beginPath();
+    canvas2d.moveTo(x1,y1);
+    canvas2d.lineTo(x2,y2);
+    canvas2d.stroke();/*debug: test raycasts*/
+    let slope = (y2-y1)/(x2-x1)
+    let b = y1-slope*x1
+    let islope = (x2-x1)/(y2-y1)
+    let ib = x1-islope*y1
+    for (let i=0; i < walls.length; i++) {
+        if (walls[i].collidable) {
+            let samplePoint1 = slope*walls[i].x+b
+            let samplePoint2 = slope*(walls[i].x+walls[i].width)+b
+            let samplePoint3 = islope*walls[i].y+ib
+            let samplePoint4 = islope*(walls[i].y+walls[i].height)+ib
+            if (walls[i].y <= samplePoint1 && samplePoint1 <= walls[i].y + walls[i].height) {
+                if (rayHitWithinRange(walls[i].x, samplePoint1, x1, y1, x2, y2)) {
+                    return true
+                }
+            }
+            if (walls[i].y <= samplePoint2 && samplePoint2 <= walls[i].y + walls[i].height) {
+                if (rayHitWithinRange(walls[i].x+walls[i].width, samplePoint2, x1, y1, x2, y2)) {
+                    return true
+                }
+            }
+            if (walls[i].x <= samplePoint3 && samplePoint3 <= walls[i].x + walls[i].width) {
+                if (rayHitWithinRange(samplePoint3, walls[i].y, x1, y1, x2, y2)) {
+                    return true
+                }
+            }
+            if (walls[i].x <= samplePoint4 && samplePoint4 <= walls[i].x + walls[i].width) {
+                if (rayHitWithinRange(samplePoint4, walls[i].y+walls[i].height, x1, y1, x2, y2)) {
+                    return true
+                }
+            }
+        }
+    }
+    return false
+}
+
+function rayHitWithinRange(hitX, hitY, startX, startY, toX, toY) { //used for prev
+    let minX = startX
+    let minY = startY
+    let maxX = toX
+    let maxY = toY
+    if (minX>maxX) {
+        let temp = minX
+        minX = maxX
+        maxX = temp
+    }
+    if (minY>maxY) {
+        let temp = minY
+        minY = maxY
+        maxY = temp
+    }
+    if (minX <= hitX && hitX <= maxX) {
+        if (minX == maxX) {
+            if (minY <= hitY && hitY <= maxY) {
+                return true
+            }
+        } else {
+            return true
+        }
+    } else {
+        return false
+    }
+}
+
+//return closest
+function closestCalc(start, to) { //used 4x, could be optimized for those
+    let hit = false
+    let dist = Math.sqrt((to.x-start.x)**2+(to.y-start.y)**2)+1
+    let ray = rayCalc(start.x, start.y, to.x, to.y)
+    let minX = start.x
+    let minY = start.y
+    let maxX = to.x
+    let maxY = to.y
+    if (minX>maxX) {
+        let temp = minX
+        minX = maxX
+        maxX = temp
+    }
+    if (minY>maxY) {
+        let temp = minY
+        minY = maxY
+        maxY = temp
+    }
+    for (let i=0; i < ray.length; i++) {
+        if (minX <= ray[i].x && ray[i].x <= maxX) {
+            if (minX == maxX) {
+                if (minY <= ray[i].y && ray[i].y <= maxY) {
+                    if (Math.sqrt((ray[i].x-start.x)**2+(ray[i].y-start.y)**2) < dist) {
+                        dist = Math.sqrt((ray[i].x-start.x)**2+(ray[i].y-start.y)**2)
+                        hit = true
+                    }
+                }
+            } else {
+                if (Math.sqrt((ray[i].x-start.x)**2+(ray[i].y-start.y)**2) < dist) {
+                    dist = Math.sqrt((ray[i].x-start.x)**2+(ray[i].y-start.y)**2)
+                    hit = true
+                }
+            }
+        }
+    }
+    if (hit) {
+        return dist
+    } else {
+        return -1
+    }
+}
+
+function load(string) { /*example load("500,500/player,250,30/wall,150,150,350,350;150,350,350,500,false,true,'load(levels[1])'");/**/
+    let loadState = "level";
+    let param = [""];
+    let gettingState = false;
+    for (let i=0; i<string.length; i++) {
+        if (string[i]=="/") {
+            switch (loadState) {
+                case "level":
+                    break;
+            }
+        } else if (string[i]==",") {
+            if (gettingState) {
+
+            } else {
+                param.push("");
+            }
+        } else {
+            param[param.length-1] += string[i];
+        }
+    }
+    return param;
+}
+
+//adds a wall
+function addWall(x1,y1,x2,y2,collidable=true) {
+    let wall = []
+    if (x1>x2) { [x1,x2]=[x2,x1] } //makes sure the first is less than the second
+    if (y1>y2) { [y1,y2]=[y2,y1] }
+
+    wall.x = x1
+    wall.y = y1
+    wall.width = x2-x1
+    wall.height = y2-y1
+    wall.collidable = collidable
+    walls.push(wall)
+}
+//add an enemy
+function addEnemy(x, y, width, height) {
+    enemies.push({x: x, y: y, width: width, height: height, targetX: x, targetY: y, xMom: 1, yMom: 1, addX: 0, addY: 0, active: false, TimeTillMove: 0})
+}
+
+function addPatrol(x,y) {
+    patrolPoints.push({x: x, y: y})
+}
+
+//controller input manager
+function controllerInput() {
+    if (controllerIndex != null) {
+        let gamepad = navigator.getGamepads()[controllerIndex]
+        let buttons = gamepad.buttons
+        inputs[0] = buttons[15].pressed
+        inputs[1] = buttons[14].pressed
+        inputs[2] = buttons[13].pressed
+        inputs[3] = buttons[12].pressed
+        inputs[4] = buttons[0].pressed||buttons[1].pressed||buttons[2].pressed||buttons[3].pressed
+
+        let deadZone = 0.4
+        let horizValue = gamepad.axes[0]
+        let vertValue = gamepad.axes[1]
+
+        if (horizValue >= deadZone) { inputs[0] = true }
+        if (-horizValue >= deadZone) { inputs[1] = true }
+        if (vertValue >= deadZone) { inputs[2] = true }
+        if (-vertValue >= deadZone) { inputs[3] = true }
+    }
+}
+
+//controller
+controllerIndex = null
+inputs = []
+
+//time (used for bg gradient) should not reset
+time = 0
+
+graphics = {
+    illumination: false,
+    illuminationStart: 25, //50, 25
+    illuminationDecrease: 0.25, //0.5, 0.25
+    illuminationPixelSize: 10,
+    BGClearAlpha: 0.5, //1, 0.5
+    debugPatrolPoints: false
+}
+
+game = {
+    paused: false
+}
+
+function init() {
+    //define variables
+    Keys = []
+    walls = []
+    patrolPoints = []
+    pseudoPatrolPoints = []
+    surviveTime = 0
+    flip=true
+    player = {
+        x: 245, //245
+        y: 455, //455
+        width: 10,
+        height: 10,
+        xMom: 1,
+        yMom: 1
+    }
+
+    level = {
+        
+    }
+    enemies = []
+    
+    //mouse and touch
+    click=false
+    mouseX=0
+    mouseY=0
+    isTouched=false
+    touchX=0
+    touchY=0
+    wasClicked=false
+    mouseOriginX=0
+    mouseOriginY=0
+    touchDeadZone=50
+    
+    caught = false
+    caughtTime = 0
+
+    addEnemy(245, 35, 10, 10)
+    addEnemy(245, 35, 10, 10)
+    addEnemy(245, 35, 10, 10)
+    
+    //make room
+    addWall(0,0,500,20)
+    addWall(0,0,20,500)
+    addWall(480,0,500,500)
+    addWall(0,480,500,500)
+
+    addWall(60,60,160,80)
+    addWall(200,60,300,80)
+    addWall(340,60,440,80)
+    //addWall(100,60,400,80)
+    //center room
+    addWall(150,150,160,350)
+    addWall(340,150,350,350)
+    addWall(150,150,200,160)
+    addWall(300,150,350,160)
+    addWall(150,340,200,350)
+    addWall(300,340,350,350)
+    
+    addWall(220,220,280,280)
+    addWall(240,280,260,440)
+
+    addPatrol(40,40)
+    addPatrol(460,40)
+    addPatrol(40,460)
+    addPatrol(460,460)
+
+    //addWall(150,150,350,350)
+    //invisable walls (commented)
+    //addWall(250,450,250,500)
+    //addWall(250,400,250,400)
+
+    //generate random walls (commented)
+    /*for (let i=0; i < 50; i++) {
+        let x = Math.floor(Math.random()*50)*10
+        let y = Math.floor(Math.random()*50)*10
+        let width = Math.floor(Math.random()*10)*10
+        let height = Math.floor(Math.random()*10)*10
+        if (arrayCollide({x: x, y: y, width: width, height: height}, walls)) {
+            addWall(x, y, x + width, y + height)
+        }
+    }*/
+
+}
+init()
+
+//frame function
+function newFrame() {
+    time+=0.1
+    surviveTime+=1
+    if (time==360) {
+        time=0
+    }
+    //define gradients
+    playerGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+    playerGradient.addColorStop(0,"hsl("+(time+0)+", 100%, 50%)")
+    playerGradient.addColorStop(1,"hsl("+(time+30)+", 100%, 50%)")
+
+    enemyGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+    enemyGradient.addColorStop(0,"hsl("+(time+180)+", 100%, 70%)")
+    enemyGradient.addColorStop(1,"hsl("+(time+210)+", 100%, 70%)")
+
+    wallGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+    wallGradient.addColorStop(0,"hsl("+(time+180)+", 100%, 50%)")
+    wallGradient.addColorStop(1,"hsl("+(time+210)+", 100%, 50%)")
+
+    BGGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+    BGGradient.addColorStop(0,"hsla("+(time+180)+", 100%, 30%, "+graphics.BGClearAlpha+")")
+    BGGradient.addColorStop(1,"hsla("+(time+210)+", 100%, 30%, "+graphics.BGClearAlpha+")")
+
+    //clear with gradient of background
+    //canvas2d.fillStyle=BGGradient
+    //canvas2d.fillRect(0,0,canvas.width,canvas.height)
+
+    //manage inputs
+    inputs = []
+    controllerInput()
+
+    if (Keys[32]) {
+        alert("hi");
+        Keys[32]=false;
+    }
+
+    //addEnemy(245, 35, 10, 10) //do not uncomment!!!!!1
+
+    //handle clicks and touch
+    if (click) {
+        //clicked - use mouse X and Y
+        if (wasClicked) {
+            let offsetX = mouseX - mouseOriginX
+            let offsetY = mouseY - mouseOriginY
+            if (offsetX > touchDeadZone) {inputs[0]=true}
+            if (-offsetX > touchDeadZone) {inputs[1]=true}
+            if (offsetY > touchDeadZone) {inputs[2]=true}
+            if (-offsetY > touchDeadZone) {inputs[3]=true}
+        } else {
+            mouseOriginX = mouseX
+            mouseOriginY = mouseY
+            wasClicked = true
+        }
+    } else if (isTouched) {
+        //touched - use touch X and Y
+        if (wasClicked) {
+            let offsetX = touchX - mouseOriginX
+            let offsetY = touchY - mouseOriginY
+            if (offsetX > touchDeadZone) {inputs[0]=true}
+            if (-offsetX > touchDeadZone) {inputs[1]=true}
+            if (offsetY > touchDeadZone) {inputs[2]=true}
+            if (-offsetY > touchDeadZone) {inputs[3]=true}
+        } else {
+            mouseOriginX = touchX
+            mouseOriginY = touchY
+            wasClicked = true
+        }
+    } else {
+        wasClicked = false
+    }
+
+    //move player
+    let moveX=false
+    let moveY=false
+    if (Keys[39]||Keys[68]||inputs[0]) {
+        player.x+=player.xMom
+        moveX=true
+        let collide = arrayCollide(player,walls)
+        if (collide!=-1) {
+            player.x=walls[collide].x-player.width
+            moveX=false
+        }
+    } else if (Keys[37]||Keys[65]||inputs[1]) {
+        player.x-=player.xMom
+        moveX=true
+        let collide = arrayCollide(player,walls)
+        if (collide!=-1) {
+            player.x=walls[collide].x+walls[collide].width
+            moveX=false
+        }
+    }
+
+    if (Keys[40]||Keys[83]||inputs[2]) {
+        player.y+=player.yMom
+        moveY=true
+        let collide = arrayCollide(player,walls)
+        if (collide!=-1) {
+            player.y=walls[collide].y-player.height
+            moveY=false
+        }
+    } else if (Keys[38]||Keys[87]||inputs[3]) {
+        player.y-=player.yMom
+        moveY=true
+        let collide = arrayCollide(player,walls)
+        if (collide!=-1) {
+            player.y=walls[collide].y+walls[collide].height
+            moveY=false
+        }
+    }
+
+    if (moveX) {
+        if (player.xMom<5) {
+            player.xMom+=0.1
+        }
+    } else {
+        player.xMom=1
+        player.x=Math.floor(player.x)
+    }
+    
+    if (moveY) {
+        if (player.yMom<5) {
+            player.yMom+=0.1
+        }
+    } else {
+        player.yMom=1
+        player.y=Math.floor(player.y)
+    }
+
+    //move enemies
+    for (let i=0; i < enemies.length; i++) {
+        //see if can see player
+        let visible = !cornerCast(enemies[i].x, enemies[i].y, enemies[i].width, enemies[i].height, player.x, player.y, player.width, player.height); //interesting result if remove "!"
+        let lastX = enemies[i].x
+        let lastY = enemies[i].y
+        //if can see, go to player
+        if (visible) {
+            enemies[i].targetX = player.x
+            enemies[i].targetY = player.y
+            if (enemies[i].active == false) {
+                enemies[i].TimeTillMove = 4
+                pseudoPatrolPoints.push({x: enemies[i].x, y: enemies[i].y})
+                if (pseudoPatrolPoints.length > 100) {
+                    pseudoPatrolPoints.splice(0,1)
+                }
+            }
+            enemies[i].active=true
+        }
+        //countown till can move
+        if (enemies[i].TimeTillMove > 0) {
+            enemies[i].TimeTillMove -= 1
+            enemies[i].xMom = 1
+            enemies[i].yMom = 1
+        } else {
+            let targetX = enemies[i].targetX + enemies[i].addX
+            let targetY = enemies[i].targetY + enemies[i].addY
+            let offsetX = targetX - enemies[i].x
+            //move if offset isnt 0
+            let canSee = cornerCast(enemies[i].x,enemies[i].y,enemies[i].width,enemies[i].height,enemies[i].targetX,enemies[i].targetY,player.width,player.height);
+            if (offsetX != 0) {
+                let toMoveX = enemies[i].xMom;
+                let goLeft = enemies[i].x>targetX;
+                if (goLeft) {
+                    toMoveX = -toMoveX;
+                }
+                if (Math.abs(offsetX)<=enemies[i].xMom) {
+                    toMoveX = offsetX;
+                }
+                //if can not see target from new position then toMove = 0
+                if (cornerCast(enemies[i].x+toMoveX,enemies[i].y,enemies[i].width,enemies[i].height,enemies[i].targetX,enemies[i].targetY,player.width,player.height)) {
+                    toMoveX=0;
+                }
+                enemies[i].x+=toMoveX;
+                let collide = arrayCollide(enemies[i], walls);
+                if (collide!=-1) {
+                    if (goLeft) {
+                        enemies[i].x = walls[collide].x+walls[collide].width;
+                    } else {
+                        enemies[i].x = walls[collide].x-enemies[i].width;
+                    }
+                }
+            } else {
+                enemies[i].x = Math.floor(enemies[i].x)
+                enemies[i].targetX = Math.floor(enemies[i].targetX)                    
+            }
+            if (enemies[i].x==lastX){
+                enemies[i].xMom = 1
+                enemies[i].addX = 0;
+            } else {
+                if (enemies[i].xMom < 5) {
+                    enemies[i].xMom += 0.05
+                }
+            }
+
+            let offsetY = targetY - enemies[i].y
+            if (offsetY != 0) {
+                let toMoveY = enemies[i].yMom;
+                let goUp = enemies[i].y>targetY;
+                if (goUp) {
+                    toMoveY = -toMoveY;
+                }
+                if (Math.abs(offsetY)<enemies[i].yMom) {
+                    toMoveY = offsetY;
+                }
+                //if can not see target from new position then toMove = 0
+                if (cornerCast(enemies[i].x,enemies[i].y+toMoveY,enemies[i].width,enemies[i].height,enemies[i].targetX,enemies[i].targetY,player.width,player.height)) {
+                    toMoveY=0;
+                }
+                enemies[i].y+=toMoveY;
+                let collide = arrayCollide(enemies[i], walls);
+                if (collide!=-1) {
+                    if (goUp) {
+                        enemies[i].y = walls[collide].y+walls[collide].height;
+                    } else {
+                        enemies[i].y = walls[collide].y-enemies[i].height;
+                    }
+                }
+
+            } else {
+                enemies[i].y = Math.floor(enemies[i].y)
+                enemies[i].targetY = Math.floor(enemies[i].targetY)
+            }
+            if (enemies[i].y==lastY){
+                enemies[i].yMom = 1
+                enemies[i].addY = 0;
+            } else {
+                if (enemies[i].yMom < 5) {
+                    enemies[i].yMom += 0.05
+                }
+            }
+
+            if (enemies[i].addX!=0&&enemies[i].y!=lastY) {
+                enemies[i].addX=0;
+            } else if (enemies[i].addY!=0&&enemies[i].x!=lastX) {
+                enemies[i].addY=0;
+            }
+
+            if (collide(player, enemies[i])) {
+                caught = true
+            }
+
+            if ((lastX==enemies[i].x&&lastY==enemies[i].y)) { //(offsetX==0 && offsetY==0)||
+                if (enemies[i].x!=enemies[i].targetX||enemies[i].y!=enemies[i].targetY) {
+                    if (enemies[i].x!=enemies[i].targetX&&enemies[i].y==enemies[i].targetY) {
+                        let XCast = 0;
+                        let PXCast = player.width;
+                        if (enemies[i].targetX-enemies[i].x > 0) {
+                            XCast=enemies[i].width;
+                            PXCast=0;
+                        }
+                        let topCast = rayHitCalc(enemies[i].x+XCast, enemies[i].y, enemies[i].targetX+PXCast, enemies[i].targetY)
+                        let botCast = rayHitCalc(enemies[i].x+XCast, enemies[i].y+enemies[i].height, enemies[i].targetX+PXCast, enemies[i].targetY+enemies[i].height)
+                        if (topCast&&!botCast) {
+                            enemies[i].addY = enemies[i].height;
+                        } else if (botCast&&!topCast) {
+                            enemies[i].addY = -enemies[i].height;
+                        }
+                    } else if (enemies[i].x==enemies[i].targetX&&enemies[i].y!=enemies[i].targetY) {
+                        let YCast = 0;
+                        let PYCast = player.height;
+                        if (enemies[i].targetY-enemies[i].y > 0) {
+                            YCast=enemies[i].height;
+                            PYCast=0;
+                        }
+                        let lefCast = rayHitCalc(enemies[i].x, enemies[i].y+YCast, enemies[i].targetX, enemies[i].targetY+PYCast);
+                        let rigCast = rayHitCalc(enemies[i].x+enemies[i].width, enemies[i].y+YCast, enemies[i].targetX+enemies[i].width, enemies[i].targetY+PYCast);
+                        if (lefCast&&!rigCast) {
+                            enemies[i].addX = enemies[i].width;
+                        } else if (rigCast&&!lefCast) {
+                            enemies[i].addX = -enemies[i].width;
+                        }
+                    }
+                } 
+                if (enemies[i].addX==0 && enemies[i].addY==0) {
+                    let centerX = enemies[i].x + enemies[i].width/2
+                    let centerY = enemies[i].y + enemies[i].height/2
+                    let center = {x: centerX, y: centerY}
+                    let minX = closestCalc(center, {x: centerX - 500, y: centerY})
+                    let maxX = closestCalc(center, {x: centerX + 500, y: centerY})
+                    let minY = closestCalc(center, {x: centerX, y: centerY - 500})
+                    let maxY = closestCalc(center, {x: centerX, y: centerY + 500})
+                    let hits = []
+                    if (Math.floor(Math.random()*2.5)==0) {
+                        for (let j=0; j<patrolPoints.length; j++) {
+                            if (!rayHitCalc(enemies[i].x + enemies[i].width, enemies[i].y + enemies[i].height, patrolPoints[j].x, patrolPoints[j].y)) {
+                                hits.push(patrolPoints[j])
+                            }
+                        }
+                        for (let j=0; j<pseudoPatrolPoints.length; j++) {
+                            if (!rayHitCalc(enemies[i].x + enemies[i].width, enemies[i].y + enemies[i].height, pseudoPatrolPoints[j].x, pseudoPatrolPoints[j].y)) {
+                                hits.push(pseudoPatrolPoints[j])
+                            }
+                        }
+                    }
+                    enemies[i].active = false
+                    enemies[i].targetX = Math.floor(Math.random()*(minX+maxX)+(enemies[i].x-minX))
+                    enemies[i].targetY = Math.floor(Math.random()*(minY+maxY)+(enemies[i].y-minY))
+                    enemies[i].TimeTillMove = Math.floor(Math.random()*150)
+                    if (hits.length > 0) {
+                        let choice = Math.floor(Math.random()*hits.length)
+                        enemies[i].targetX = hits[choice].x - enemies[i].width/2
+                        enemies[i].targetY = hits[choice].y - enemies[i].height/2
+                    }
+                }
+            }
+        }
+    }
+
+    /*if (!flip) {
+        player.y+=1
+        collide = arrayCollide(player,walls)
+        if (collide!=-1) {
+            player.y=walls[collide].y-player.height
+        }
+    }*/
+    
+    //clear with gradient of background
+    canvas2d.fillStyle=BGGradient
+    canvas2d.fillRect(0,0,canvas.width,canvas.height)
+
+    //make walls
+    canvas2d.fillStyle = wallGradient
+    for (let i = 0; i < walls.length; i++) {
+        canvas2d.fillRect(walls[i].x, walls[i].y, walls[i].width, walls[i].height)
+        /*canvas2d.beginPath()
+        canvas2d.roundRect(walls[i].x, walls[i].y, walls[i].width, walls[i].height, 5)
+        canvas2d.fill()/*use curved rect*/
+    }
+    //enemies
+    for (let i = 0; i < enemies.length; i++) {
+        canvas2d.fillStyle = wallGradient
+        if (enemies[i].active) {
+            canvas2d.fillStyle = playerGradient
+        }
+        canvas2d.fillRect(enemies[i].x-1, enemies[i].y-1, enemies[i].width+2, enemies[i].height+2)
+        canvas2d.fillStyle = enemyGradient
+        canvas2d.fillRect(enemies[i].x, enemies[i].y, enemies[i].width, enemies[i].height)
+    }
+
+    //illuminate
+    if (graphics.illumination) {
+        let viewRadius = Math.floor(graphics.illuminationStart/graphics.illuminationDecrease/graphics.illuminationPixelSize)*graphics.illuminationPixelSize
+        let startX = Math.floor(player.x/graphics.illuminationPixelSize)
+        let startY = Math.floor(player.y/graphics.illuminationPixelSize)
+        let hps = graphics.illuminationPixelSize/2
+        for (let i=startX-viewRadius/graphics.illuminationPixelSize-1; i < viewRadius/graphics.illuminationPixelSize+startX+1; i++) {
+            for (let j=startY-viewRadius/graphics.illuminationPixelSize-1; j < viewRadius/graphics.illuminationPixelSize+startY+1; j++) {
+                if (!rayHitCalc(i*graphics.illuminationPixelSize+hps, j*graphics.illuminationPixelSize+hps, Math.floor(player.x) + player.width/2, Math.floor(player.y) + player.height/2)) {
+                    canvas2d.fillStyle = "hsla(0, 0%, 100%, "+(graphics.illuminationStart-Math.sqrt((i*graphics.illuminationPixelSize+hps-player.x-player.width/2)**2+(j*graphics.illuminationPixelSize+hps-player.y-player.height/2)**2)*graphics.illuminationDecrease)+"%)"
+                    //canvas2d.fillStyle = "white"
+                    canvas2d.fillRect(i*graphics.illuminationPixelSize, j*graphics.illuminationPixelSize, graphics.illuminationPixelSize, graphics.illuminationPixelSize)
+                }
+            }
+        }
+    }
+
+    //<debug> patrol points
+    if (graphics.debugPatrolPoints) {
+        for (let i=0; i<patrolPoints.length; i++) {
+            canvas2d.fillStyle = playerGradient
+            canvas2d.fillRect(patrolPoints[i].x-2, patrolPoints[i].y-2, 5, 5)
+        }
+    }
+
+    //player
+    canvas2d.fillStyle = playerGradient
+    canvas2d.fillRect(player.x, player.y, player.width, player.height)
+    /*canvas2d.beginPath()
+    canvas2d.roundRect(player.x, player.y, player.width, player.height, 3)
+    canvas2d.fill()/*use curved rect*/
+
+    canvas2d.fillStyle = playerGradient
+    canvas2d.textAlign = "start"
+    canvas2d.font = "18px consolas"
+    canvas2d.fillText("Time: "+Math.floor(surviveTime/3600)+":"+Math.floor(surviveTime/600%6)+Math.floor(surviveTime/60%10)+"."+Math.floor(surviveTime/60%1*10), 2, 17)
+    //canvas2d.fillText(wasClicked, 2, 40)
+    //canvas2d.fillText(touchX, 2, 60)
+    //canvas2d.fillText(touchY, 2, 80)
+    
+    if (caught){
+        canvas2d.fillStyle = playerGradient
+        canvas2d.font = "48px consolas"
+        canvas2d.textAlign = "center"
+        canvas2d.fillText("Caught!", canvas.width/2, canvas.height/2)
+        caughtTime+=1
+        if (caughtTime == 20) {
+            let survivedTime = surviveTime-20
+            if (survivedTime >= 3600) {alert("Congratulations on surviving more than 1 minute with a time of: \n" +Math.floor(survivedTime/3600)+":"+Math.floor(survivedTime/600%6)+Math.floor(survivedTime/60%10)+"."+Math.floor(survivedTime/60%1*10))}
+            //location.reload()
+            init()
+        }
+    }
+}
+
+//keyboard inputs
+document.onkeydown = function(pressed) {
+    if (pressed.keyCode==32) {
+        flip=!flip
+        player.yMom=1
+    }
+    Keys[pressed.keyCode] = true
+}
+document.onkeyup = function(released) {
+    Keys[released.keyCode] = false
+}
+
+//mouse inputs
+document.addEventListener("mousedown", (e) => {click=true})
+document.addEventListener("mouseup", (e) => {click=false})
+document.addEventListener("mousemove", (e) => {
+    let canvasPos = canvas.getBoundingClientRect()
+    mouseX = e.pageX-canvasPos.left
+    mouseY = e.pageY-canvasPos.top
+})
+//touch inputs
+document.addEventListener("touchstart", (e) => {let canvasPos = canvas.getBoundingClientRect();isTouched = true; touchX=e.touches[0].clientX-canvasPos.left; touchY=e.touches[0].clientY-canvasPos.top})
+document.addEventListener("touchend", (e) => {isTouched=false})
+document.addEventListener("touchcancel", (e) => {isTouched=false})
+document.addEventListener("touchmove", (e) => {let canvasPos = canvas.getBoundingClientRect();touchX=e.touches[0].clientX-canvasPos.left;touchY=e.touches[0].clientY-canvasPos.top})
+
+//controller inputs
+window.addEventListener("gamepadconnected", (event) => {
+    controllerIndex = event.gamepad.index
+})
+window.addEventListener("gamepaddisconnected", (event)=>{
+    controllerIndex = null
+})
+
+//log=[];console.log=function(){log.push(Array.from(arguments));};
+
+//run update every ~1/60th seconds
+//setInterval(newFrame, 16)
+const targetFPS = 60;
+var lastFrame = 0;
+
+function updateHandler() {
+    let deltaTime = Date.now() - lastFrame; //change in time
+    if (targetFPS && deltaTime >= 1000 / targetFPS) { //if exeeds when next frame should happen
+        newFrame();
+        lastFrame = Math.floor(Date.now() / (1000/targetFPS)) * (1000/targetFPS); //magic sauce: does when the frame SHOULD HAVE BEEN instead of when it is
+    }
+    requestAnimationFrame(updateHandler); //call next frame
+}
+
+requestAnimationFrame(updateHandler);
+
+</script>
+
+</body>

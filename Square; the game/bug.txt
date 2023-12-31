@@ -1,0 +1,4 @@
+x: 292
+y: 160
+targetX: 293
+targetY: 158

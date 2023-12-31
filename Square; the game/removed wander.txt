@@ -1,0 +1,57 @@
+//head in random direction
+                        let direction = Math.random() * 2 * Math.PI
+                        let farX = enemies[i].x+Math.sin(direction)*1000
+                        let farY = enemies[i].y+Math.cos(direction)*1000
+                        let closest = closestCalc(enemies[i], { x: enemies[i].x+Math.sin(direction)*1000, y: enemies[i].y+Math.cos(direction)*1000 })
+                        //alert(enemies[i].x+Math.sin(direction)*closest)
+                        //alert(enemies[i].y+Math.cos(direction)*closest)
+                        canvas2d.fillStyle = "red"
+                        canvas2d.beginPath()
+                        canvas2d.moveTo(enemies[i].x, enemies[i].y)
+                        canvas2d.lineTo(enemies[i].x+Math.sin(direction)*closest, enemies[i].y+Math.cos(direction)*closest)
+                        canvas2d.stroke()
+                        //alert("draw")
+                        //canvas2d.fillRect(enemies[i].x+Math.sin(direction)*closest-2, enemies[i].y+Math.cos(direction)*closest-2, 5, 5)
+
+                        //alert(closest)
+                        
+                        // let angle = Math.random() * 2 * Math.PI
+                        // let closest = 1000
+                        // let ray = rayCalc(enemies[i].x, enemies[i].y, 0, 0)// enemies[i].x+Math.sin(angle)*1000, enemies[i].y+Math.cos(angle)*1000)
+                        // for (let j=0; j < ray.length; j++) {
+                        //     canvas2d.fillRect(ray[j].x-2, ray[j].y-2, 5, 5)
+                        // }
+                        // let minX = enemies[i].x+enemies[i].width/2
+                        // let maxX = player.x+player.width/2
+                        // let minY = enemies[i].y+enemies[i].height/2
+                        // let maxY = player.y+player.height/2
+                        // if (minX>maxX) {
+                        //     let temp = minX
+                        //     minX = maxX
+                        //     maxX = temp
+                        // }
+                        // if (minY>maxY) {
+                        //     let temp = minY
+                        //     minY = maxY
+                        //     maxY = temp
+                        // }
+                        // for (let i = 0; i < ray.length; i++) {
+                        //     if (minX <= ray[i].x && ray[i].x <= maxX) {
+                        //         if (minX == maxX) {
+                        //             if (minY <= ray[i].y && ray[i].y <= maxY) {
+                        //                 let dist = Math.sqrt((maxX-minX)^2+(maxY-minY)^2)
+                        //                 if (dist<closest) {
+                        //                     closest=dist
+                        //                 }
+                        //             }
+                        //         } else {
+                        //             let dist = Math.sqrt((maxX-minX)^2+(maxY-minY)^2)
+                        //             if (dist<closest) {
+                        //                 closest=dist
+                        //             }
+                        //         }
+                        //     }
+                        // }
+                        // //alert(angle)
+                        // //alert(closest)
+                        // canvas2d.fillRect(Math.sin(angle)-2, Math.cos(angle)-2, 4, 4)

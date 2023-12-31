@@ -1,0 +1,99 @@
+<body>
+    <script>
+        //keyPressed
+        Keys = []
+
+        walls = []
+
+        time = 0
+
+        player = {
+            x: 0,
+            y: 0,
+            xMom: 0,
+            yMom: 0
+        }
+
+        var canvas = document.createElement("canvas")
+        canvas.width = 500
+        canvas.height = 500
+        document.body.appendChild(canvas)
+
+        var canvas2d = canvas.getContext("2d")
+
+        function addWall(x1,y1,x2,y2,color) {
+            walls[walls.length] = [x1,y1,x2+x1,y2+y1,color]
+        }
+
+        function newFrame() {
+            playerGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+            playerGradient.addColorStop(0,"hsl("+0+", 100%, 50%)")
+            playerGradient.addColorStop(1,"hsl("+30+", 100%, 50%)")
+
+            wallGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+            wallGradient.addColorStop(0,"hsl("+150+", 100%, 50%)")
+            wallGradient.addColorStop(1,"hsl("+180+", 100%, 50%)")
+
+            BGGradient = canvas2d.createLinearGradient(0,0,canvas.width,canvas.height)
+            BGGradient.addColorStop(0,"hsl("+150+", 20%, 75%)")
+            BGGradient.addColorStop(1,"hsl("+180+", 20%, 75%)")
+
+            moveX=false
+            moveY=false
+            if (Keys[39]) {
+                player.x+=xMom
+                moveX=true
+            }
+            if (Keys[37]) {
+                player.x-=xMom
+                moveX=true
+            }
+            if (Keys[40]) {
+                player.y+=yMom
+                moveY=true
+            }
+            if (Keys[38]) {
+                player.y-=yMom
+                moveY=true
+            }
+
+            if (moveX) {
+                if (xMom<5) {
+                    xMom+=0.1
+                }
+            } else {
+                xMom=1
+                player.x=Math.floor(player.x)
+            }
+            
+            if (moveY) {
+                if (yMom<5) {
+                    yMom+=0.1
+                }
+            } else {
+                yMom=1
+                player.y=Math.floor(player.y)
+            }
+            
+            //canvas2d.fillStyle = "lightgray"
+            canvas2d.fillStyle=BGGradient
+            canvas2d.fillRect(0,0,canvas.width,canvas.height)
+
+            canvas2d.fillStyle = wallGradient
+            canvas2d.fillRect(player.x, player.y+10, 10, 10)
+            //canvas2d.fillStyle = "red"
+            canvas2d.fillStyle = playerGradient
+            canvas2d.fillRect(player.x, player.y, 10, 10)
+        }
+
+        document.onkeydown = function(pressed) {
+            Keys[pressed.keyCode] = true
+        }
+        document.onkeyup = function(released) {
+            Keys[released.keyCode] = false
+        }
+
+        setInterval(newFrame, 17)
+
+    </script><canvas width="500" height="500"></canvas>
+</body>
