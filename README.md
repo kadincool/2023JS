@@ -1,1 +1,1 @@
-These are my things I made in 2023... as well as some downloaded things, those obviously arent mine. I beleve all the downloaded ones are in the GLSL folder so the rest should be made by me for the most part, don't count on it though.
+These are my things I made in 2023... as well as some downloaded things, those obviously arent mine. I beleve all the downloaded ones are in the GLSL folder and the GPT folder is made by chatGPT so the rest should be made by me for the most part, don't count on it though.
